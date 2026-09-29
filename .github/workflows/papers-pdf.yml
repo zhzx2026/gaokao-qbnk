@@ -27,16 +27,17 @@ jobs:
       - name: Fonts available
         run: |
           {
-            fc-list : family | grep -iE "stix|asana|gyre|noto (serif|sans) cjk sc|fandol|liberation serif|latin modern math|kai" | sort -u | head -80
-            kpsewhich tabularray.sty tcolorbox.sty pgfplots.sty ctex.sty unicode-math.sty
-            tex --version | head -1; xelatex --version | head -1
+            dpkg -l | grep -iE "gyre|stix|asana|fandol|fonts-" | awk '{print $2}' | tr '\n' ' '
+            echo; echo ---otf; ls /usr/share/texlive/texmf-dist/fonts/opentype/public/ | tr '\n' ' '
+            echo; echo ---kpse; for f in texgyretermes-math.otf texgyretermes-regular.otf STIX2Math.otf STIXTwoMath-Regular.otf STIXMath-Regular.otf asana-math.otf latinmodern-math.otf FandolKai-Regular.otf; do echo "$f: $(kpsewhich $f)"; done
+            echo ---fc; fc-list | grep -iE "gyre|stix|asana|fandol" | head -20
           } > /tmp/fonts.txt 2>&1
       - name: Clone math sources
         run: git clone --depth 1 https://github.com/DxAThing/Gaokao-Math-Problems-Compilation.git dx && git -C dx rev-parse HEAD > /tmp/dxrev.txt
       - name: Try compile one paper
         run: |
           cd dx
-          sed -e 's/{SimSun}/{Noto Serif CJK SC}/; s/SimHei/Noto Sans CJK SC/; s/KaiTi/FandolKai/; s/{Times New Roman}/{TeX Gyre Termes}/' styles.tex > styles_qbnk.tex
+          sed -e 's/{SimSun}/{Noto Serif CJK SC}/; s/SimHei/Noto Sans CJK SC/; s/KaiTi/AR PL KaitiM GB/; s/{Times New Roman}/{TeX Gyre Termes}/' styles.tex > styles_qbnk.tex
           cat > probe.tex <<'TEX'
           \documentclass[12pt, oneside, UTF8]{ctexbook}
           \input{styles_qbnk.tex}
