@@ -14,7 +14,23 @@
       "tier": "T1",
       "publisher": "教育部教育考试院",
       "url": "https://www.neea.edu.cn/",
-      "coverage": { "subjects": ["语文", "数学", "英语", "物理", "化学", "生物", "政治", "历史", "地理"], "years": "2014-", "regions": ["全国"] },
+      "coverage": {
+        "subjects": [
+          "语文",
+          "数学",
+          "英语",
+          "物理",
+          "化学",
+          "生物",
+          "政治",
+          "历史",
+          "地理"
+        ],
+        "years": "2014-",
+        "regions": [
+          "全国"
+        ]
+      },
       "access": "open",
       "full_text_policy": "allow",
       "license": "官方公开发布，转载需署名",
@@ -28,7 +44,24 @@
       "tier": "T2",
       "publisher": "中国教育在线（赛尔互联）",
       "url": "https://gaokao.eol.cn/shiti/",
-      "coverage": { "subjects": ["语文", "数学", "英语", "物理", "化学", "生物", "政治", "历史", "地理"], "years": "2006-", "regions": ["全国", "各省"] },
+      "coverage": {
+        "subjects": [
+          "语文",
+          "数学",
+          "英语",
+          "物理",
+          "化学",
+          "生物",
+          "政治",
+          "历史",
+          "地理"
+        ],
+        "years": "2006-",
+        "regions": [
+          "全国",
+          "各省"
+        ]
+      },
       "access": "open",
       "full_text_policy": "allow",
       "license": "网站声明可转载，须注明出处",
@@ -42,7 +75,15 @@
       "tier": "T2",
       "publisher": "中国教育在线 转载 教育部教育考试院",
       "url": "https://www.eol.cn/kaoshi/gaokao/gkzx/",
-      "coverage": { "subjects": ["语文"], "years": "2026", "regions": ["全国"] },
+      "coverage": {
+        "subjects": [
+          "语文"
+        ],
+        "years": "2026",
+        "regions": [
+          "全国"
+        ]
+      },
       "access": "open",
       "full_text_policy": "allow",
       "license": "官方解析转载",
@@ -56,7 +97,15 @@
       "tier": "T2",
       "publisher": "北京日报报业集团",
       "url": "https://news.bjd.com.cn/",
-      "coverage": { "subjects": ["语文"], "years": "2026", "regions": ["全国"] },
+      "coverage": {
+        "subjects": [
+          "语文"
+        ],
+        "years": "2026",
+        "regions": [
+          "全国"
+        ]
+      },
       "access": "open",
       "full_text_policy": "allow",
       "license": "新闻转载",
@@ -70,7 +119,20 @@
       "tier": "T3",
       "publisher": "大学生必备网",
       "url": "https://www.dxsbb.com/news/list_457.html",
-      "coverage": { "subjects": ["语文"], "years": "2019-2026", "regions": ["全国", "北京", "上海", "天津", "浙江", "新高考I/II"] },
+      "coverage": {
+        "subjects": [
+          "语文"
+        ],
+        "years": "2019-2026",
+        "regions": [
+          "全国",
+          "北京",
+          "上海",
+          "天津",
+          "浙江",
+          "新高考I/II"
+        ]
+      },
       "access": "open",
       "full_text_policy": "allow",
       "license": "教育类站点整理稿，转载需署名",
@@ -84,7 +146,19 @@
       "tier": "T3",
       "publisher": "本地宝",
       "url": "https://m.qz.bendibao.com/edu/38017.shtm",
-      "coverage": { "subjects": ["语文"], "years": "2026", "regions": ["全国I", "全国II", "北京", "天津", "上海"] },
+      "coverage": {
+        "subjects": [
+          "语文"
+        ],
+        "years": "2026",
+        "regions": [
+          "全国I",
+          "全国II",
+          "北京",
+          "天津",
+          "上海"
+        ]
+      },
       "access": "open",
       "full_text_policy": "allow",
       "license": "地方生活门户整理稿",
@@ -98,7 +172,15 @@
       "tier": "T3",
       "publisher": "新浪网",
       "url": "https://finance.sina.com.cn/",
-      "coverage": { "subjects": ["语文"], "years": "2026", "regions": ["全国"] },
+      "coverage": {
+        "subjects": [
+          "语文"
+        ],
+        "years": "2026",
+        "regions": [
+          "全国"
+        ]
+      },
       "access": "open",
       "full_text_policy": "allow",
       "license": "新闻转载",
@@ -112,7 +194,17 @@
       "tier": "T3",
       "publisher": "GitHub 开源仓库（deekur）",
       "url": "https://github.com/deekur/gaokaomath",
-      "coverage": { "subjects": ["数学"], "years": "1952-2026", "regions": ["全国", "各省", "春季高考"] },
+      "coverage": {
+        "subjects": [
+          "数学"
+        ],
+        "years": "1952-2026",
+        "regions": [
+          "全国",
+          "各省",
+          "春季高考"
+        ]
+      },
       "access": "open",
       "full_text_policy": "index_only",
       "license": "仓库自带 LICENSE，导入前须复核；原卷版权归命题机构",
@@ -126,7 +218,17 @@
       "tier": "T3",
       "publisher": "GitHub 开源仓库（deekur）",
       "url": "https://github.com/deekur/gaokaophysics",
-      "coverage": { "subjects": ["物理"], "years": "1952-2026", "regions": ["全国", "各省", "春季高考"] },
+      "coverage": {
+        "subjects": [
+          "物理"
+        ],
+        "years": "1952-2026",
+        "regions": [
+          "全国",
+          "各省",
+          "春季高考"
+        ]
+      },
       "access": "open",
       "full_text_policy": "index_only",
       "license": "仓库自带 LICENSE，导入前须复核；原卷版权归命题机构",
@@ -140,7 +242,24 @@
       "tier": "T4",
       "publisher": "GitHub 开源仓库（Econom1cc）",
       "url": "https://github.com/Econom1cc/gaokao-papers-index",
-      "coverage": { "subjects": ["语文", "数学", "英语", "物理", "化学", "生物", "政治", "历史", "地理"], "years": "2008-2026", "regions": ["全国", "31 省"] },
+      "coverage": {
+        "subjects": [
+          "语文",
+          "数学",
+          "英语",
+          "物理",
+          "化学",
+          "生物",
+          "政治",
+          "历史",
+          "地理"
+        ],
+        "years": "2008-2026",
+        "regions": [
+          "全国",
+          "31 省"
+        ]
+      },
       "access": "open",
       "full_text_policy": "index_only",
       "license": "仓库自述来源混杂，仅作缺口清单与采集路线图使用",
@@ -154,7 +273,15 @@
       "tier": "T4",
       "publisher": "GitHub（Binkic 等）",
       "url": "https://github.com/Binkic/Reciter",
-      "coverage": { "subjects": ["语文"], "years": "不限", "regions": ["全国"] },
+      "coverage": {
+        "subjects": [
+          "语文"
+        ],
+        "years": "不限",
+        "regions": [
+          "全国"
+        ]
+      },
       "access": "open",
       "full_text_policy": "index_only",
       "license": "MIT（代码与数据组织）；内容源自社区收集与百科",
@@ -168,7 +295,16 @@
       "tier": "T3",
       "publisher": "学科网（北京凤凰学易）",
       "url": "https://www.zxxk.com/",
-      "coverage": { "subjects": ["全科"], "years": "不限", "regions": ["全国", "各省"] },
+      "coverage": {
+        "subjects": [
+          "全科"
+        ],
+        "years": "不限",
+        "regions": [
+          "全国",
+          "各省"
+        ]
+      },
       "access": "login-required",
       "full_text_policy": "index_only",
       "license": "商业版权题库，禁止批量抓取正文",
@@ -182,7 +318,18 @@
       "tier": "T3",
       "publisher": "菁优网",
       "url": "https://www.jyeoo.com/",
-      "coverage": { "subjects": ["数学", "物理", "化学", "生物"], "years": "不限", "regions": ["全国"] },
+      "coverage": {
+        "subjects": [
+          "数学",
+          "物理",
+          "化学",
+          "生物"
+        ],
+        "years": "不限",
+        "regions": [
+          "全国"
+        ]
+      },
       "access": "login-required",
       "full_text_policy": "index_only",
       "license": "商业版权题库，禁止批量抓取正文",
@@ -196,7 +343,16 @@
       "tier": "T4",
       "publisher": "华禹教育网（原中国高校网）",
       "url": "http://www.huaue.com/zw.htm",
-      "coverage": { "subjects": ["语文"], "years": "1951-2026", "regions": ["全国", "各省"] },
+      "coverage": {
+        "subjects": [
+          "语文"
+        ],
+        "years": "1951-2026",
+        "regions": [
+          "全国",
+          "各省"
+        ]
+      },
       "access": "unstable",
       "full_text_policy": "index_only",
       "license": "站点整理稿",
@@ -210,13 +366,76 @@
       "tier": "T4",
       "publisher": "百度百科（UGC）",
       "url": "https://baike.baidu.com/",
-      "coverage": { "subjects": ["语文"], "years": "2008-2026", "regions": ["全国", "各省"] },
+      "coverage": {
+        "subjects": [
+          "语文"
+        ],
+        "years": "2008-2026",
+        "regions": [
+          "全国",
+          "各省"
+        ]
+      },
       "access": "open",
       "full_text_policy": "index_only",
       "license": "UGC，引用需谨慎",
       "adapter": null,
       "status": "planned",
       "notes": "只作交叉验证与线索，不作唯一来源。"
+    },
+    {
+      "id": "gh-dx-gaokaomath-tex",
+      "name": "GitHub DxAThing/Gaokao-Math-Problems-Compilation：高考数学真题 LaTeX 重排（含答案解析）",
+      "tier": "T3",
+      "publisher": "GitHub 开源仓库（DxAThing 及贡献者）",
+      "url": "https://github.com/DxAThing/Gaokao-Math-Problems-Compilation",
+      "coverage": {
+        "subjects": [
+          "数学"
+        ],
+        "years": "1952-2026",
+        "regions": [
+          "全国",
+          "各省",
+          "春季高考"
+        ]
+      },
+      "access": "open",
+      "full_text_policy": "allow",
+      "license": "CC BY-SA 4.0（重排/整理部分）；题源 deekur/gaokaomath（CC BY 4.0）；试题著作权归命题机构",
+      "adapter": "scripts/pdf/build_pdfs.py",
+      "status": "active",
+      "notes": "在 deekur/gaokaomath 基础上重排的 LaTeX 源码（含答案与解析、重绘题图）。CI 里只在构建时拉取，不入库；由它编译出的 PDF 属于改编作品，须以 CC BY-SA 4.0 继续共享并署名。"
+    },
+    {
+      "id": "gh-gaokao-bench",
+      "name": "GitHub OpenLMLab/GAOKAO-Bench 与 GAOKAO-Bench-Updates：结构化高考题（2010-2024）",
+      "tier": "T3",
+      "publisher": "GitHub 开源仓库（OpenLMLab）",
+      "url": "https://github.com/OpenLMLab/GAOKAO-Bench",
+      "coverage": {
+        "subjects": [
+          "语文",
+          "英语",
+          "数学",
+          "物理",
+          "化学",
+          "生物",
+          "政治",
+          "历史",
+          "地理"
+        ],
+        "years": "2010-2024",
+        "regions": [
+          "全国"
+        ]
+      },
+      "access": "open",
+      "full_text_policy": "allow",
+      "license": "Apache-2.0（数据整理）；试题著作权归命题机构",
+      "adapter": "scripts/pdf/build_pdfs.py",
+      "status": "active",
+      "notes": "OCR 整理的结构化题目，只是各卷的一部分（多为客观题 + 少量主观题），公式/选项偶有 OCR 错误。只用于生成明确标注为“节选卷”的 PDF，未逐题二次校对，不得当作完整试卷或已核验数据。"
     }
   ]
 }
