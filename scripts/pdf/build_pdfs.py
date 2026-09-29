@@ -212,19 +212,43 @@ SUBJ_FILE = [
     ("Chinese", "语文"), ("English", "英语"), ("Math", "数学"), ("Physics", "物理"), ("Chemistry", "化学"),
     ("Biology", "生物"), ("Political", "政治"), ("History", "历史"), ("Geography", "地理"),
 ]
-_ROMAN = {"Ⅰ": "I", "Ⅱ": "II", "Ⅲ": "III", "ⅰ": "I", "ⅱ": "II", "ⅲ": "III"}
+_ROMAN = {"ⅰ": "I", "ⅱ": "II", "ⅲ": "III", "Ⅰ": "I", "Ⅱ": "II", "Ⅲ": "III"}
 _OPT = re.compile(r"(?:^|\n|\s)([A-D])\s*[．.、:：]\s*")
 
 
-def norm_paper(cat: str) -> str:
-    c = re.sub(r"[（()）]", "", cat or "")
+def norm_paper(cat: str, track: str = "") -> str | None:
+    """把 GAOKAO-Bench 里五花八门的 category 归一成卷别；认不出来（数据里混进了题干）返回 None。"""
+    c = re.sub(r"[（()）\s]", "", str(cat or ""))
+    if not c:
+        return None
+    if len(c) > 14:
+        return None
     for a, b in _ROMAN.items():
         c = c.replace(a, b)
-    c = c.replace("ii", "II").replace("iii", "III").replace("i", "I") if re.search(r"卷?[iI]+$|[iI]+卷?$", c) else c
-    c = c.replace("新课标卷", "新课标卷").replace("解析版", "").strip()
-    if c and not c.endswith("卷"):
-        c += "卷"
-    return c or "全国卷"
+    c = re.sub(r"(?<![A-Za-z])(iii|ii|i)(?![A-Za-z])", lambda m: m.group(1).upper(), c)
+    m = re.search(r"(III|II|I)", c)
+    rom = m.group(1) if m else ""
+    if "新高考" in c:
+        name = f"新高考{rom}卷" if rom else "新高考卷"
+    elif "新课标" in c:
+        name = f"新课标{rom}卷" if rom else "新课标卷"
+    elif "全国甲" in c or c in ("甲卷", "高考甲卷"):
+        name = "全国甲卷"
+    elif "全国乙" in c or c in ("乙卷", "高考乙卷"):
+        name = "全国乙卷"
+    elif "全国" in c:
+        name = f"全国{rom}卷" if rom else "全国卷"
+    elif "解析版" in c:
+        name = "未标注卷别"
+    else:
+        return None
+    if track:
+        name += f"（{track}）"
+    elif "理科" in c:
+        name += "（理科）"
+    elif "文科" in c:
+        name += "（文科）"
+    return name
 
 
 def split_options(q: str):
@@ -251,7 +275,7 @@ def load_gaokao_bench(work: Path) -> list[dict]:
         for f in sorted(base.rglob("*.json")):
             name = f.name
             subj = next((zh for en, zh in SUBJ_FILE if en in name), None)
-            if not subj:
+            if not subj or subj in ("数学", "物理"):   # 数学/物理已有完整来源
                 continue
             kind = "选择题" if ("MCQs" in name or "Reading_Comp" in name or "Fill_in_Blanks" in name or "Cloze" in name
                                 or "Modern_Lit" in name) else "非选择题"
@@ -262,7 +286,10 @@ def load_gaokao_bench(work: Path) -> list[dict]:
                     year = int(e["year"])
                 except Exception:
                     continue
-                recs.append({"subject": subj, "year": year, "paper": norm_paper(e.get("category", "")),
+                paper = norm_paper(e.get("category", ""))
+                if paper is None:
+                    continue
+                recs.append({"subject": subj, "year": year, "paper": paper,
                              "kind": kind, "file": name, "index": e.get("index", 0), "score": e.get("score"),
                              "question": e.get("question") or "", "answer": e.get("answer"),
                              "analysis": e.get("analysis") or "", "repo": repo})
@@ -270,7 +297,7 @@ def load_gaokao_bench(work: Path) -> list[dict]:
 
 
 def render_problem(r: dict) -> str:
-    q = r["question"].strip()
+    q = re.sub(r"^\s*\d+\s*[.．、]\s*(?:[（(]\s*\d+(?:\.\d+)?\s*分\s*[)）]\s*)?", "", r["question"].strip())
     ans = r["answer"]
     ans_txt = "、".join(ans) if isinstance(ans, list) else (str(ans) if ans not in (None, "") else "")
     sp = split_options(q) if r["kind"] == "选择题" else None
@@ -302,8 +329,9 @@ def prep_excerpt(work: Path, args) -> list[dict]:
         q = json.loads(line)
         if q["year"] < MIN_YEAR or (args.only_year and q["year"] != args.only_year):
             continue
-        groups[("语文", q["year"], norm_paper(q.get("paper") or q.get("region") or ""))].append(
-            {"subject": "语文", "year": q["year"], "paper": norm_paper(q.get("paper") or q.get("region") or ""),
+        pname = q.get("paper") or q.get("region") or ""
+        groups[("语文", q["year"], pname)].append(
+            {"subject": "语文", "year": q["year"], "paper": pname,
              "kind": "作文", "file": "zuowen", "index": int(re.sub(r"\D", "", q.get("question_no") or "") or 99),
              "score": q.get("score"), "question": q["stem"], "answer": None, "analysis": q.get("analysis") or "",
              "repo": "qbnk"})
@@ -334,7 +362,9 @@ def prep_excerpt(work: Path, args) -> list[dict]:
                 f"\\show{'answertrue' if showans else 'answerfalse'}\n\\tallpagefalse\n"
                 "\\begin{document}\n\\mainmatter\n"
                 f"\\examyear{{{year}年}}%\n{body}"
-                + colophon("excerpt", SOURCES[src_key], "", "main")
+                + colophon("excerpt", SOURCES[src_key],
+                           "\\textbf{校对状态}：来源为 OCR 整理的结构化数据，尚未逐题二次校对，公式/选项可能有误，请以原卷为准。\\par"
+                           if src_key == "gaokao-bench" else "", "main")
                 + "\\end{document}\n"
             )
             (dx / "_qbnk" / f"{jid}.tex").write_text(tex, encoding="utf-8")
@@ -398,9 +428,10 @@ def cmd_compile(args) -> int:
             tail = ""
             if logf.exists():
                 lines = logf.read_text(errors="replace").splitlines()
-                errs = [k for k, l in enumerate(lines) if l.startswith("!") or ":" in l[:60] and "error" in l.lower()]
+                pat = re.compile(r"^(!|\S+\.(tex|sty|cls|def|cfg|fd|xdv):\d+:)")
+                errs = [k for k, l in enumerate(lines) if pat.match(l)]
                 k = errs[0] if errs else max(0, len(lines) - 40)
-                tail = "\n".join(lines[max(0, k - 3): k + 14])
+                tail = "\n".join(lines[max(0, k - 2): k + 16])
             rec["error"] = tail
             (res_dir / "fail" / f"{j['id']}.txt").write_text(tail, encoding="utf-8")
         results.append(rec)
