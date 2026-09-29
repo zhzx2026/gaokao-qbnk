@@ -20,7 +20,7 @@ permissions:
 
 env:
   # 试点期：只编译这一年（留空 = 2000 年以后全部）。
-  ONLY_YEAR: ${{ github.event.inputs.only_year || '2024' }}
+  ONLY_YEAR: ${{ github.event.inputs.only_year || '' }}
 
 jobs:
   plan:
@@ -90,6 +90,7 @@ jobs:
           path: shards
       - name: Merge + commit
         run: |
+          rm -rf pdf
           python3 scripts/pdf/build_pdfs.py merge --results shards --out pdf --dist dist --repo-min-year 2024 --repo-kinds "$([ -n "$ONLY_YEAR" ] && echo typeset,excerpt,archive || echo typeset,excerpt)" --release-tag pdf-latest | tee /tmp/merge.txt
           du -sh pdf dist | tee -a /tmp/merge.txt
           git config user.name "qbnk-bot"; git config user.email "qbnk-bot@users.noreply.github.com"
