@@ -1,0 +1,105 @@
+name: sources-health
+
+# 定期复核每一条题目的出处链接是否还活着。
+# 源站删稿 = 我们的证据链断了，必须知道，否则题库会悄悄退化成"野题"。
+on:
+  schedule:
+    - cron: '37 2 1 * *'   # 每月 1 号 10:37（北京时间）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 复核所有出处链接
+        run: python3 -m tools.qbnk.cli verify-sources --timeout 20
+
+      - name: 分析健康度
+        id: analyze
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          from collections import Counter
+
+          data = json.load(open("reports/sources_health.json", encoding="utf-8"))
+          res = data["results"]
+          c = Counter(r["status"] for r in res)
+          dead = [r for r in res if r["status"] in ("http_error",)]
+          flaky = [r for r in res if r["status"] == "unreachable"]
+
+          print("### 出处链接健康度\n")
+          print(f"- 检查 {len(res)} 条，可达 {c.get('ok', 0)}，"
+                f"HTTP 异常 {c.get('http_error', 0)}，无法连接 {c.get('unreachable', 0)}\n")
+          if dead:
+              print("**失效链接（源站已删稿或改版，证据链断裂）：**\n")
+              for r in dead:
+                  print(f"- `{r['source_id']}` {r['status']} {r['note']} → {r['url']}")
+              print()
+          if flaky:
+              print("**连接异常（可能是临时故障，需再确认）：**\n")
+              for r in flaky[:20]:
+                  print(f"- `{r['source_id']}` {r['note']} → {r['url']}")
+              print()
+
+          with open("dead_links.md", "w", encoding="utf-8") as f:
+              f.write(f"自动生成于 {data['generated_at']}（sources-health workflow）\n\n")
+              f.write("| source_id | 状态 | 说明 | URL |\n|---|---|---|---|\n")
+              for r in dead + flaky:
+                  f.write(f"| {r['source_id']} | {r['status']} | {r['note']} | {r['url']} |\n")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"dead={len(dead)}\nflaky={len(flaky)}\n")
+          PY
+
+      - name: 提交健康度报告
+        run: |
+          git config user.name  "qbnk-collector[bot]"
+          git config user.email "qbnk-collector[bot]@users.noreply.github.com"
+          git add reports/sources_health.json
+          if git diff --cached --quiet; then
+            echo "报告无变化，跳过提交"
+          else
+            git commit -m "chore(sources): 出处链接健康度快照 $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: 发现失效链接就开 issue
+        if: steps.analyze.outputs.dead != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEAD: ${{ steps.analyze.outputs.dead }}
+          RUN_DATE: ${{ github.run_id }}
+        run: |
+          set -e
+          TITLE="出处链接失效（run ${RUN_DATE}，${DEAD} 条）"
+          EXISTING=$(gh issue list --label source-dead-link --state open --limit 1 --json number --jq '.[0].number' || true)
+          if [ -n "${EXISTING:-}" ]; then
+            gh issue comment "$EXISTING" --body-file dead_links.md
+            echo "已追加到既有 issue #$EXISTING"
+          else
+            {
+              echo "\`sources-health\` 复核发现下列出处链接已失效（HTTP 异常）。"
+              echo ""
+              echo "这些链接对应的题目**证据链已断裂**：要么补新的存档链接（web archive 等）并写进 \`source.evidence[]\`，"
+              echo "要么把记录降级为 \`single_source\`／移入 \`data/quarantine/\`。详见 [docs/sources.md](docs/sources.md)。"
+              echo ""
+              cat dead_links.md
+            } > issue_body.md
+            gh label create source-dead-link --color D93F0B --description "出处链接失效" --force >/dev/null 2>&1 || true
+            gh issue create --title "$TITLE" --body-file issue_body.md --label source-dead-link
+          fi

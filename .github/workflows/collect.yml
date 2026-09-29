@@ -1,0 +1,112 @@
+name: collect
+
+# 需要联网的采集全部在 Actions 上跑：
+#   · 高考季（6/7-6/12）每天一次，真题公布后尽快入库
+#   · 平时每周日一次，慢慢补历史卷
+#   · 也可以在任何时候手动触发（Actions → collect → Run workflow）
+on:
+  schedule:
+    - cron: '17 1 7-12 6 *'   # 6月7-12日 每天 09:17（北京时间）
+    - cron: '23 3 * * 0'      # 每周日 11:23（北京时间）
+  workflow_dispatch:
+    inputs:
+      adapters:
+        description: 要跑的适配器
+        type: choice
+        options: [all, dxsbb, eol]
+        default: all
+      open_pr:
+        description: 产出后自动开 PR 待人工复核
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 跑采集适配器 → data/staging/
+        id: collect
+        continue-on-error: true
+        env:
+          EOL_LIMIT: '30'
+        run: bash scripts/collect.sh "${{ inputs.adapters || 'all' }}"
+
+      - name: 生成汇总
+        id: summary
+        run: |
+          {
+            echo '### 采集结果'
+            echo ''
+            echo '```'
+            python3 -m tools.qbnk.cli check-staging 2>&1 | tail -n 30
+            echo '```'
+            echo ''
+            echo '> 这些记录落在 `data/staging/`，**必须人工复核后**才能移入 `data/questions/`。'
+            echo '> 复核要点见 [docs/pipeline.md](docs/pipeline.md) 第 3 节。'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "changed=$(git status --porcelain data/staging | wc -l)" >> "$GITHUB_OUTPUT"
+
+      - name: 上传 staging 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-${{ github.run_number }}
+          path: data/staging/
+          if-no-files-found: ignore
+
+      - name: 提交并开 PR 待人工复核
+        if: steps.summary.outputs.changed != '0' && !(github.event_name == 'workflow_dispatch' && inputs.open_pr == false)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          set -e
+          BRANCH="collect/$(date -u +%Y%m%d-%H%M)"
+          git config user.name  "qbnk-collector[bot]"
+          git config user.email "qbnk-collector[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add data/staging
+          git commit -m "chore(collect): staging $(date -u +%Y-%m-%d)（适配器自动采集，待人工复核）"
+          git push origin "$BRANCH"
+
+          {
+            echo "由 \`collect\` workflow（run #${{ github.run_number }}）自动采集，产出在 \`data/staging/\`。"
+            echo ""
+            echo "**合入前必须完成人工复核**（[流程说明](docs/pipeline.md)）："
+            echo ""
+            echo "- [ ] 逐条比对第二个独立来源，确认题干/选项/答案一致"
+            echo "- [ ] 补 `verification.status`（verified / single_source / conflict）并填写 `source.evidence[]`"
+            echo "- [ ] 移到 \`data/questions/\` 后跑 \`qbnk validate --fix-hash\`"
+            echo ""
+            echo "小工具：\`python3 -m tools.qbnk.cli check-staging --dir data/staging\`"
+          } > pr_body.md
+          gh label create collect --color 0E8A16 --description "自动采集产出，待人工复核" --force >/dev/null 2>&1 || true
+          gh pr create --base "$BASE" --head "$BRANCH" \
+            --title "collect: staging $(date -u +%Y-%m-%d)" --body-file pr_body.md \
+            --label collect || echo "::warning::PR 创建失败（可能已存在同名 PR）"
+
+          # GITHUB_TOKEN 建的 PR 不会自动触发其它 workflow，这里手动触发一次校验
+          gh workflow run qbnk.yml --ref "$BRANCH" || true
+
+      - name: 没有新内容
+        if: steps.summary.outputs.changed == '0'
+        run: echo "本轮适配器没有产生新记录（源站无更新或被限流），无需开 PR。"

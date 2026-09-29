@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# 采集下来的外部大仓库（原卷 PDF 等）不进版本库
+external_repos/
+/tmp/
+
+# 编辑器与系统
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# 注：data/index 与 reports 是生成物但需要提交（便于直接浏览与 CI diff），不忽略

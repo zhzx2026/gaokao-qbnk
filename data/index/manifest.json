@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-09-29",
+  "schema_version": "1.0",
+  "counts": {
+    "questions": 37,
+    "papers": 1246
+  },
+  "stats": {
+    "questions": 37,
+    "papers": 1246,
+    "by_subject": {
+      "语文": 37
+    },
+    "by_year": {
+      "2022": 8,
+      "2023": 8,
+      "2024": 7,
+      "2026": 6,
+      "2025": 5,
+      "2021": 3
+    },
+    "by_region": {
+      "全国": 15,
+      "北京": 10,
+      "上海": 6,
+      "天津": 6
+    },
+    "by_paper": {
+      "北京卷": 10,
+      "上海卷": 6,
+      "天津卷": 6,
+      "全国甲卷": 3,
+      "全国乙卷": 2,
+      "新课标II卷": 2,
+      "新课标I卷": 2,
+      "全国II卷": 1,
+      "全国I卷": 1,
+      "全国一卷": 1,
+      "全国二卷": 1,
+      "新高考II卷": 1,
+      "新高考I卷": 1
+    },
+    "by_type": {
+      "写作": 32,
+      "微写作": 5
+    },
+    "by_exam_type": {
+      "真题": 37
+    },
+    "by_source_tier": {
+      "T2": 2,
+      "T3": 35
+    },
+    "by_verification": {
+      "single_source": 31,
+      "verified": 6
+    },
+    "with_answer": 0,
+    "with_analysis": 2
+  },
+  "files": [
+    "data/questions/zuowen.jsonl"
+  ]
+}
