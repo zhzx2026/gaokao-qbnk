@@ -37,6 +37,7 @@ FONT_MAP = [
     ("SimHei", "Noto Sans CJK SC"),
     ("KaiTi", "AR PL KaitiM GB"),
     ("{Times New Roman}", "{TeX Gyre Termes}"),
+    ("{TeX Gyre Termes Math}", "{STIXTwoMath-Regular.otf}"),
     ("{STIX}", "{STIXTwoMath-Regular.otf}"),
     ("{Asana Math}", "{STIXTwoMath-Regular.otf}"),
 ]
