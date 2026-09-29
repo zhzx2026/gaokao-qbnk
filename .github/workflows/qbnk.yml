@@ -1,0 +1,46 @@
+name: qbnk
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate（schema + 溯源规则）
+        run: python3 -m tools.qbnk.cli validate --strict
+
+      - name: Dedup（查重）
+        run: python3 -m tools.qbnk.cli dedup
+
+      - name: Rebuild index & reports
+        run: |
+          python3 -m tools.qbnk.cli index
+          python3 -m tools.qbnk.cli report
+          python3 -m tools.qbnk.cli stats
+
+      - name: Fail if generated files are out of date
+        run: |
+          git diff --exit-code -- data/index reports \
+            || { echo "::error::data/index 或 reports 与数据不一致，请本地运行 'make pipeline' 后重新提交"; exit 1; }
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qbnk-reports
+          path: reports/
