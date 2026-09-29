@@ -1,57 +1,90 @@
 name: papers-pdf
 
+# 用 XeLaTeX 统一编译所有试卷 PDF：
+#   数学（2000 年后）整卷重排；其它学科为题库节选卷；物理为原卷套统一版式。
+# 产物：pdf/**/*.pdf + pdf/manifest.json，编译完自动提交回当前分支。
 on:
   push:
     paths:
       - ".github/workflows/papers-pdf.yml"
-      - "latex/**"
       - "scripts/pdf/**"
   workflow_dispatch:
+    inputs:
+      only_year:
+        description: "只编译某一年（留空=全部 2000 年以后）"
+        required: false
+        default: ""
 
 permissions:
   contents: write
 
+env:
+  # 试点期：只编译这一年。全量时改成空串。
+  ONLY_YEAR: ${{ github.event.inputs.only_year || '2024' }}
+  SHARDS: 3
+
 jobs:
-  probe:
+  build:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
     steps:
       - uses: actions/checkout@v4
       - name: Install TeX Live + fonts
         run: |
-          exec > >(tee -a /tmp/diag.log) 2>&1
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
             texlive-xetex texlive-latex-recommended texlive-latex-extra texlive-science \
-            texlive-fonts-recommended texlive-lang-chinese texlive-pictures texlive-plain-generic \
-            latexmk texlive-fonts-extra fonts-noto-cjk fonts-liberation fontconfig ghostscript poppler-utils
-      - name: Fonts available
+            texlive-fonts-recommended texlive-fonts-extra texlive-lang-chinese texlive-pictures \
+            texlive-plain-generic latexmk fonts-noto-cjk fonts-arphic-gkai00mp fonts-texgyre \
+            fonts-liberation fontconfig ghostscript poppler-utils
+      - name: Clone sources
         run: |
-          {
-            dpkg -l | grep -iE "gyre|stix|asana|fandol|fonts-" | awk '{print $2}' | tr '\n' ' '
-            echo; echo ---otf; ls /usr/share/texlive/texmf-dist/fonts/opentype/public/ | tr '\n' ' '
-            echo; echo ---kpse; for f in texgyretermes-math.otf texgyretermes-regular.otf STIX2Math.otf STIXTwoMath-Regular.otf STIXMath-Regular.otf asana-math.otf latinmodern-math.otf FandolKai-Regular.otf; do echo "$f: $(kpsewhich $f)"; done
-            echo ---fc; fc-list | grep -iE "gyre|stix|asana|fandol" | head -20
-          } > /tmp/fonts.txt 2>&1
-      - name: Clone math sources
-        run: git clone --depth 1 https://github.com/DxAThing/Gaokao-Math-Problems-Compilation.git dx && git -C dx rev-parse HEAD > /tmp/dxrev.txt
-      - name: Try compile one paper
+          mkdir -p work
+          git clone -q --depth 1 https://github.com/DxAThing/Gaokao-Math-Problems-Compilation.git work/dx
+          git clone -q --depth 1 https://github.com/deekur/gaokaophysics.git work/gaokaophysics
+          git clone -q --depth 1 https://github.com/OpenLMLab/GAOKAO-Bench.git work/gkb
+          git clone -q --depth 1 https://github.com/OpenLMLab/GAOKAO-Bench-Updates.git work/gku
+      - name: Prepare jobs
         run: |
-          cd dx
-          sed -e 's/{SimSun}/{Noto Serif CJK SC}/; s/SimHei/Noto Sans CJK SC/; s/KaiTi/AR PL KaitiM GB/; s/{Times New Roman}/{TeX Gyre Termes}/' styles.tex > styles_qbnk.tex
-          cat > probe.tex <<'TEX'
-          \documentclass[12pt, oneside, UTF8]{ctexbook}
-          \input{styles_qbnk.tex}
-          \showanswerfalse
-          \tallpagefalse
-          \begin{document}
-          \mainmatter
-          \input{content/2024/new_gaokao_paper_1.tex}
-          \end{document}
-          TEX
-          sed -i 's/^          //' probe.tex
-          ( time latexmk -xelatex -interaction=nonstopmode -halt-on-error probe.tex ) > /tmp/compile.txt 2>&1 || true
-          ls -la probe.pdf >> /tmp/compile.txt 2>&1 || true
-          grep -n -B2 -A12 "^!" probe.log | head -60 >> /tmp/compile.txt || true
-      - name: Emit diagnostics
+          ARGS=""; [ -n "$ONLY_YEAR" ] && ARGS="--only-year $ONLY_YEAR"
+          python3 scripts/pdf/build_pdfs.py prepare --work work $ARGS | tee /tmp/prepare.txt
+      - name: Compile
+        run: |
+          python3 scripts/pdf/build_pdfs.py compile --work work --shard ${{ matrix.shard }}/$SHARDS --results results 2>&1 | tee /tmp/compile.txt
+          du -sh results/pdf || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}
+          path: results
+      - name: Diagnostics
         if: always()
-        run: python3 scripts/pdf/diag.py /tmp/dxrev.txt /tmp/fonts.txt /tmp/compile.txt
+        run: |
+          cat results/fail/*.txt > /tmp/fails.txt 2>/dev/null || true
+          python3 scripts/pdf/diag.py /tmp/prepare.txt /tmp/compile.txt /tmp/fails.txt
+
+  collect:
+    needs: build
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: shards
+      - name: Merge + commit
+        run: |
+          python3 scripts/pdf/build_pdfs.py merge --results shards --out pdf | tee /tmp/merge.txt
+          du -sh pdf | tee -a /tmp/merge.txt
+          git config user.name "qbnk-bot"; git config user.email "qbnk-bot@users.noreply.github.com"
+          git add pdf
+          git commit -m "pdf: 编译产物 $(date -u +%F) [skip ci]" || echo "nothing to commit"
+          git pull --rebase -q origin ${{ github.ref_name }} || true
+          git push origin HEAD:${{ github.ref_name }}
+      - name: Diagnostics
+        if: always()
+        run: python3 scripts/pdf/diag.py /tmp/merge.txt pdf/failed.txt
