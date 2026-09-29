@@ -111,9 +111,45 @@ _SPECIAL = {"\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "#": r"\#", "_": 
 _MATH = re.compile(r"\$\$(.+?)\$\$|\$(.+?)\$|\\\((.+?)\\\)|\\\[(.+?)\\\]", re.S)
 
 
+def _table(lines: list[str]) -> str:
+    rows = []
+    for l in lines:
+        cells = [c.strip() for c in l.strip().strip("|").split("|")]
+        if all(re.fullmatch(r":?-{2,}:?", c) or not c for c in cells) and any(cells):
+            continue
+        rows.append(cells)
+    n = max(len(r) for r in rows)
+    body = "".join(" & ".join(tex_text(c) for c in r + [""] * (n - len(r))) + " \\\\ \\hline\n" for r in rows)
+    return ("\n\n\\begin{center}\\small\\renewcommand{\\baselinestretch}{1.15}"
+            f"\\begin{{tabular}}{{|*{{{n}}}{{p{{\\dimexpr0.86\\linewidth/{n}\\relax}}|}}}}\\hline\n{body}"
+            "\\end{tabular}\\end{center}\n\n")
+
+
 def tex_text(s: str) -> str:
-    """普通文本转义；$...$ 数学原样保留（统一转成 \\( \\)）。"""
-    s = (s or "").replace("\r", "")
+    """普通文本转义；$...$ 数学原样保留（统一转成 \\( \\)）；Markdown 表格转 tabular。"""
+    s = re.sub(r"<br\s*/?>", " ", (s or "").replace("\r", ""))
+    if re.search(r"(?m)^\s*\|", s):
+        out, buf = [], []
+        for l in s.split("\n"):
+            if l.strip().startswith("|"):
+                buf.append(l)
+                continue
+            if buf:
+                out.append(("\x01", buf)); buf = []
+            out.append(("t", l))
+        if buf:
+            out.append(("\x01", buf))
+        text_lines, res = [], []
+        for kind, v in out:
+            if kind == "t":
+                text_lines.append(v)
+            else:
+                if text_lines:
+                    res.append(tex_text("\n".join(text_lines))); text_lines = []
+                res.append(_table(v))
+        if text_lines:
+            res.append(tex_text("\n".join(text_lines)))
+        return "".join(res)
     out, pos = [], 0
     for m in _MATH.finditer(s):
         out.append(_plain(s[pos:m.start()]))
@@ -317,7 +353,7 @@ def render_problem(r: dict) -> str:
     q = re.sub(r"^\s*\d+\s*[.．、]\s*(?:[（(]\s*\d+(?:\.\d+)?\s*分\s*[)）]\s*)?", "", r["question"].strip())
     ans = r["answer"]
     ans_txt = "、".join(ans) if isinstance(ans, list) else (str(ans) if ans not in (None, "") else "")
-    sp = split_options(q) if r["kind"] == "选择题" else None
+    sp = None   # 选项保持原文（每行一个段落），\\choices 对长文字选项排版不稳
     if sp:
         stem, opts = sp
         body = tex_text(stem) + "\n\n\\choices\n" + "".join("  {" + re.sub(r"\s*\n\s*", " ", tex_text(o)).strip() + "}\n" for o in opts)
