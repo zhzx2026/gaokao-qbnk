@@ -131,7 +131,7 @@ footer{margin-top:60px;color:var(--mute);font-size:13px;text-align:center}
 <nav><div class="in">
   <b>高考<i>题库</i></b>
   <a href="#coverage">覆盖度</a><a href="#quality">来源与核验</a><a href="#questions">题目浏览</a>
-  <a href="#papers">试卷档案</a><a href="#sources">来源登记</a><a href="#gate">野题闸门</a>
+  <a href="#pdfs">试卷 PDF</a><a href="#papers">试卷档案</a><a href="#sources">来源登记</a><a href="#gate">野题闸门</a>
 </div></nav>
 
 <main>
@@ -166,6 +166,18 @@ footer{margin-top:60px;color:var(--mute);font-size:13px;text-align:center}
       <input id="q-search" type="search" placeholder="搜索题干 / 卷别 / 关键词…">
     </div>
     <div class="qs" id="q-list"></div>
+  </section>
+
+  <section id="pdfs">
+    <h2>试卷 PDF</h2>
+    <p class="sub">全部由 XeLaTeX 用同一套版式编译。<b>整卷重排</b>＝完整试卷（含试题版和答案解析版）；<b>节选卷</b>＝题库里已有的部分题目，不是完整试卷；<b>原卷套版</b>＝原卷影印页加统一封面和页眉页脚，题目正文尚未转写。</p>
+    <div class="kpis" id="pdf-kpis" style="margin:0 0 14px"></div>
+    <div class="filters">
+      <select id="f-kind"></select><select id="f-subj"></select><select id="f-ed"></select><select id="f-yr"></select>
+      <input id="f-q" type="search" placeholder="搜索卷别，如 新高考、全国甲卷、北京…">
+    </div>
+    <div class="card"><div class="tw"><table class="tbl"><thead><tr><th>年份</th><th>学科</th><th>试卷</th><th>类型</th><th>版本</th><th>页数</th><th>大小</th><th>下载</th></tr></thead><tbody id="f-body"></tbody></table></div>
+      <div class="pager"><span id="f-count"></span><span><button id="f-prev">上一页</button> <span id="f-page"></span> <button id="f-next">下一页</button></span></div></div>
   </section>
 
   <section id="papers">
@@ -392,6 +404,47 @@ function renderPapers() {
   $("#p-count").textContent = `共 ${list.length} 份`;
   $("#p-page").textContent = `${pState.page + 1} / ${pages}`;
   $("#p-prev").disabled = pState.page <= 0; $("#p-next").disabled = pState.page >= pages - 1;
+}
+
+/* ---------------- PDF library ---------------- */
+const KIND = {typeset: "整卷重排", excerpt: "节选卷", archive: "原卷套版"};
+const KIND_TIP = {typeset: "var(--ok)", excerpt: "var(--warn)", archive: "var(--t2)"};
+const PD = D.pdfs.filter(x => x.ok);
+const fs = {page: 0, size: 15};
+(function initPdf() {
+  const box = $("#pdf-kpis");
+  if (!D.pdfs.length) { box.replaceChildren(h("div", {class: "empty"}, "还没有编译产物：运行 papers-pdf workflow（或 scripts/pdf/build_pdfs.py）后重新 make viz。")); return; }
+  for (const k of Object.keys(KIND)) {
+    const xs = PD.filter(x => x.kind === k);
+    box.append(h("div", {class: "card kpi"}, h("div", {class: "n", style: `color:${KIND_TIP[k]}`}, xs.length), h("div", {class: "l"}, KIND[k]),
+      h("div", {class: "d"}, [...new Set(xs.map(x => x.subject))].join("、") || "—")));
+  }
+  const bad = D.pdfs.length - PD.length;
+  box.append(h("div", {class: "card kpi" + (bad ? " bad" : "")}, h("div", {class: "n"}, bad), h("div", {class: "l"}, "编译失败"), h("div", {class: "d"}, `共 ${D.pdfs.length} 个任务`)));
+  const opt = (sel, all, vals, lab = v => v) => $(sel).append(h("option", {value: ""}, all), vals.map(v => h("option", {value: v}, lab(v))));
+  opt("#f-kind", "全部类型", Object.keys(KIND), k => KIND[k]);
+  opt("#f-subj", "全部学科", [...new Set(PD.map(x => x.subject))]);
+  opt("#f-ed", "全部版本", [...new Set(PD.map(x => x.edition))]);
+  opt("#f-yr", "全部年份", [...new Set(PD.map(x => x.year))].sort((a, b) => b - a));
+  for (const s of ["#f-kind", "#f-subj", "#f-ed", "#f-yr"]) $(s).onchange = () => { fs.page = 0; renderPdf(); };
+  $("#f-q").oninput = () => { fs.page = 0; renderPdf(); };
+  $("#f-prev").onclick = () => { fs.page--; renderPdf(); }; $("#f-next").onclick = () => { fs.page++; renderPdf(); };
+  renderPdf();
+})();
+function renderPdf() {
+  const k = $("#f-kind").value, s = $("#f-subj").value, e = $("#f-ed").value, y = $("#f-yr").value, q = $("#f-q").value.trim();
+  const list = PD.filter(x => (!k || x.kind === k) && (!s || x.subject === s) && (!e || x.edition === e) && (!y || String(x.year) === y) && (!q || x.title.includes(q)))
+    .sort((a, b) => b.year - a.year || a.title.localeCompare(b.title, "zh") || a.edition.localeCompare(b.edition, "zh"));
+  const pages = Math.max(1, Math.ceil(list.length / fs.size));
+  fs.page = Math.min(Math.max(0, fs.page), pages - 1);
+  $("#f-body").replaceChildren(...list.slice(fs.page * fs.size, (fs.page + 1) * fs.size).map(x => h("tr", {},
+    h("td", {}, x.year), h("td", {}, x.subject), h("td", {}, x.title.replace(/^\d+年\s*/, "")),
+    h("td", {}, h("span", {class: "pill", style: `color:${KIND_TIP[x.kind]}`}, KIND[x.kind])), h("td", {}, x.edition),
+    h("td", {}, x.pages || "—"), h("td", {}, x.size ? (x.size / 1024).toFixed(0) + " KB" : "—"),
+    h("td", {}, x.in_repo ? h("a", {href: "pdf/" + x.path, target: "_blank"}, "打开 PDF")
+      : h("a", {href: `https://github.com/zhzx2026/gaokao-qbnk/releases/download/${D.pdf_release_tag || "pdf-latest"}/${x.zip}`, title: "在 zip 内：" + x.path}, "Release 压缩包")))));
+  $("#f-count").textContent = `共 ${list.length} 份`; $("#f-page").textContent = `${fs.page + 1} / ${pages}`;
+  $("#f-prev").disabled = fs.page <= 0; $("#f-next").disabled = fs.page >= pages - 1;
 }
 
 /* ---------------- Sources ---------------- */

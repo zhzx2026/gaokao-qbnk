@@ -64,7 +64,18 @@ def build_payload() -> dict:
         "records": used.get(s["id"], 0),
     } for s in reg.get("sources", [])]
 
+    pdf_manifest = REPO_ROOT / "pdf" / "manifest.json"
+    pdfs = {"papers": [], "release_tag": None, "sources": {}}
+    if pdf_manifest.exists():
+        pdfs = json.loads(pdf_manifest.read_text(encoding="utf-8"))
+    pdf_rows = [{
+        "id": x["id"], "kind": x["kind"], "subject": x["subject"], "year": x["year"], "title": x["title"],
+        "edition": x["edition"], "path": x.get("path"), "size": x.get("size"), "pages": x.get("pages"),
+        "in_repo": bool(x.get("in_repo")), "zip": x.get("zip"), "ok": x["ok"], "nq": x.get("n_questions"),
+    } for x in pdfs.get("papers", [])]
+
     return {
+        "pdfs": pdf_rows, "pdf_release_tag": pdfs.get("release_tag"),
         "generated_at": date.today().isoformat(),
         "stats": summarize(qs, ps),
         "questions": questions,
