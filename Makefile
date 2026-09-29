@@ -32,5 +32,11 @@ report:
 verify:
 	$(QBNK) verify-sources
 
+check-staging:
+	$(QBNK) check-staging
+
+collect:
+	bash scripts/collect.sh
+
 clean:
 	rm -rf data/index reports

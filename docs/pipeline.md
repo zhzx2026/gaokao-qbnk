@@ -45,10 +45,26 @@ python3 -m tools.qbnk.cli index && python3 -m tools.qbnk.cli report
 - `content_hash` 是正文指纹：正文被改动而哈希没更新会触发 `W-HASH-MISMATCH`，防止"悄悄改题"。
 - CI（`.github/workflows/qbnk.yml`）在每次 PR 跑 validate + dedup，红就不合。
 
-## 6. 沙箱/离线环境提示
+## 6. 采集跑在 GitHub Actions 上（推荐）
+
+需要联网的适配器不在个人机器上跑，统一走 [`.github/workflows/collect.yml`](../.github/workflows/collect.yml)：
+
+```
+定时/手动触发 → scripts/collect.sh → 适配器 → data/staging/*.jsonl
+             → qbnk check-staging → 上传 artifact
+             → 建 collect/<日期> 分支 → 提交 → gh pr create（label: collect）
+             → gh workflow run qbnk.yml --ref <分支>（让校验在 PR 上跑一遍）
+```
+
+- 高考季（6/7–6/12）每天一次，真题公布后尽快有料；平时每周日一次慢慢补历史卷。
+- **PR 里只有 staging 的内容，绝不直接改 `data/questions/`**——合入前必须完成第 3 节的人工复核。
+- 复核完把记录移进 `data/questions/` 后，本地跑 `make pipeline` 再提交，`qbnk.yml` 会再校验一次。
+
+## 7. 沙箱/离线环境提示
 
 在受限网络（如本仓库的开发沙箱）里，bash 出网可能被限制，此时：
 
 - **能跑**：基于本地克隆的适配器（gaokaomath / gaokaophysics / Reciter）、全部校验与报告命令；
 - **跑不了**：需要抓取网页的适配器（dxsbb / eol）会明确报 `抓取失败 …（本适配器需联网环境运行）`，
-  换到能联网的机器或 CI 上执行即可，产出物格式完全一致。
+  `scripts/collect.sh` 也会提示"本轮未产出记录"并继续。换到能联网的机器或
+  **Actions 上点一次 `collect`** 即可，产出物格式完全一致。

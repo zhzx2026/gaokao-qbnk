@@ -72,6 +72,7 @@ python3 -m tools.qbnk.cli dedup                 # 查重（精确 + 近似）
 python3 -m tools.qbnk.cli index                 # 生成 data/index/*.json
 python3 -m tools.qbnk.cli report                # 生成 reports/*.md
 python3 -m tools.qbnk.cli verify-sources        # 复核所有出处链接是否还活着（需联网）
+python3 -m tools.qbnk.cli check-staging         # 检查 data/staging/ 适配器产出是否可复核
 ```
 
 一条命令跑完：`make pipeline`（等价于 validate → stats → dedup → index → report）。
@@ -98,7 +99,27 @@ python3 sources/adapters/gaokaomath_papers.py --repo /tmp/gaokaomath \
 python3 -m tools.qbnk.cli validate
 ```
 
-## 六、怎么加一道题
+## 六、用 GitHub Actions 跑采集（不用自己开机器）
+
+需要联网的采集全部放在 Actions 上，跑完自动开 PR 等人复核，`data/questions/` 永远只进人工看过的题。
+
+| Workflow | 触发时机 | 做什么 |
+| --- | --- | --- |
+| [`collect.yml`](.github/workflows/collect.yml) | 高考季 **6/7–6/12 每天** + 平时**每周日**；可手动 | 跑 dxsbb / eol 适配器 → `data/staging/` → `check-staging` → 开 PR（label `collect`） |
+| [`qbnk.yml`](.github/workflows/qbnk.yml) | 每次 push / PR | `validate --strict` + `dedup` + 重建索引与报告，生成物不一致直接报红 |
+| [`sources-health.yml`](.github/workflows/sources-health.yml) | **每月 1 号**；可手动 | 复核全部出处链接；失效的开 issue（label `source-dead-link`），报告提交回仓库 |
+
+手动跑一次采集：Actions → **collect** → `Run workflow` → 选 `adapters`（all / dxsbb / eol）→ 勾 `open_pr`。
+
+几个实现上的注意点（踩过的坑已经写进 workflow）：
+
+- 采集分支形如 `collect/20260929-0317`，PR 的 base 是仓库默认分支；
+- `GITHUB_TOKEN` 建的 PR 默认不会触发其它 workflow，所以 collect 末尾会显式
+  `gh workflow run qbnk.yml --ref <branch>`，让校验真的在 PR 上跑一遍；
+- 采集失败（源站限流/改版/robots 禁止）不算 job 失败，只在 job summary 里提示，避免误报报警；
+- 链接失效 ≠ 立刻删题：先补 web archive 等存档链接写进 `source.evidence[]`，补不上再降级或移入隔离区。
+
+## 七、怎么加一道题
 
 1. 先确认来源等级：官方/权威媒体 → 可用；社区/文库 → 进隔离区等核验。
 2. 抄一条 `data/questions/zuowen.jsonl` 里的记录改，或在 `sources/registry.json` 登记新来源后新建分片。
@@ -107,7 +128,7 @@ python3 -m tools.qbnk.cli validate
 
 字段含义见 [`docs/schema.md`](docs/schema.md)，完整流程见 [`docs/pipeline.md`](docs/pipeline.md)。
 
-## 七、许可与责任
+## 八、许可与责任
 
 - **代码、schema、适配器**：MIT，见 [LICENSE](LICENSE)。
 - **数据**：试题著作权归命题机构，本库以学习研究/教学参考为目的收录并逐条标注出处，

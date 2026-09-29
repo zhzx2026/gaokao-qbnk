@@ -22,9 +22,9 @@ from pathlib import Path
 
 from .core import (
     DATA_DIR, PAPERS_DIR, QUESTIONS_DIR, QUARANTINE_DIR, REPO_ROOT, REGISTRY_PATH,
-    SUBJECTS, by_verification, find_duplicates, hash_question, load_papers,
+    SUBJECTS, by_verification, find_duplicates, hash_question, iter_jsonl, load_papers,
     load_questions, load_registry, make_id, registry_index, summarize,
-    validate_papers, validate_questions,
+    schema_validators, validate_papers, validate_questions,
 )
 
 INDEX_DIR = DATA_DIR / "index"
@@ -312,6 +312,48 @@ def cmd_verify_sources(args) -> int:
     return 0
 
 
+def cmd_check_staging(args) -> int:
+    """检查 data/staging/ 下的适配器产出：结构与出处必须完整（等级与状态可以不合格）。"""
+    d = Path(args.dir)
+    files = sorted(d.rglob("*.jsonl"))
+    if not files:
+        print(f"（{d} 下没有 jsonl，无需检查）")
+        return 0
+    validators = schema_validators()
+    if not validators:
+        print("⚠ 未安装 jsonschema，只做基础字段检查（pip install -r requirements.txt 可得完整校验）")
+    total = errs = 0
+    rows = []
+    for f in files:
+        recs = [r for _p, _i, r in iter_jsonl([f]) if "__parse_error__" not in r]
+        n_err = 0
+        for r in recs:
+            total += 1
+            rid = r.get("id", "?")
+            v = validators.get("question" if str(rid).startswith("q-") else "paper")
+            if v is not None:
+                clean = {k: v2 for k, v2 in r.items() if not k.startswith("__")}
+                for e in list(v.iter_errors(clean))[:3]:
+                    n_err += 1
+                    errs += 1
+                    print(f"  [schema] {rid} {f.name}: {'/'.join(map(str, e.path))}: {e.message}")
+            src = r.get("source") or {}
+            if not src.get("url"):
+                n_err += 1
+                errs += 1
+                print(f"  [source] {rid} 缺少 source.url（野题，直接丢弃）")
+            if not src.get("source_id"):
+                n_err += 1
+                errs += 1
+                print(f"  [source] {rid} 缺少 source.source_id")
+        rows.append([str(f.relative_to(REPO_ROOT)), len(recs), n_err])
+    print(_md_table(rows, ["文件", "记录数", "问题数"]))
+    print(f"\nstaging 合计 {total} 条记录，{errs} 处问题")
+    print("说明：staging 允许存在 T4 / rejected 记录，但 JSON 结构与出处字段必须完整，"
+          "否则人工无法复核，应在适配器里修好再重跑。")
+    return 1 if errs else 0
+
+
 def cmd_new_id(args) -> int:
     print(make_id(args.year, args.subject, args.paper, args.seq))
     return 0
@@ -352,6 +394,10 @@ def main(argv=None) -> int:
     p.add_argument("--timeout", type=float, default=10.0)
     p.add_argument("--limit", type=int, default=0)
     p.set_defaults(func=cmd_verify_sources)
+
+    p = sub.add_parser("check-staging", help="检查 data/staging/ 下适配器产出的结构与出处完整性")
+    p.add_argument("--dir", default=str(DATA_DIR / "staging"))
+    p.set_defaults(func=cmd_check_staging)
 
     p = sub.add_parser("new-id", help="生成合规题目 id")
     p.add_argument("--year", type=int, required=True)
