@@ -156,6 +156,13 @@ def cmd_index(args) -> int:
     return 0
 
 
+def cmd_viz(args) -> int:
+    from .viz import build_site
+    out = build_site()
+    print(f"✔ 可视化页面已生成：{out.relative_to(REPO_ROOT)}（{out.stat().st_size // 1024} KB，自包含，可直接双击打开）")
+    return 0
+
+
 def _md_table(rows, header):
     out = ["| " + " | ".join(header) + " |", "|" + "|".join(["---"] * len(header)) + "|"]
     for r in rows:
@@ -386,6 +393,9 @@ def main(argv=None) -> int:
 
     p = sub.add_parser("index", help="生成索引 data/index/*.json")
     p.set_defaults(func=cmd_index)
+
+    p = sub.add_parser("viz", help="生成可视化页面 site/index.html（自包含，无需联网）")
+    p.set_defaults(func=cmd_viz)
 
     p = sub.add_parser("report", help="生成 reports/coverage.md 与 reports/provenance.md")
     p.set_defaults(func=cmd_report)

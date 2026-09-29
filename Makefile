@@ -1,7 +1,7 @@
 PY ?= python3
 QBNK := $(PY) -m tools.qbnk.cli
 
-.PHONY: help pipeline validate stats dedup index report verify clean
+.PHONY: help pipeline validate stats dedup index report viz serve verify clean
 
 help:
 	@echo "make pipeline   # validate → stats → dedup → index → report"
@@ -10,6 +10,8 @@ help:
 	@echo "make dedup      # 查重"
 	@echo "make index      # 生成 data/index/*.json"
 	@echo "make report     # 生成 reports/*.md"
+	@echo "make viz        # 生成可视化页面 site/index.html"
+	@echo "make serve      # 生成并在 http://localhost:8000 预览"
 	@echo "make verify     # 复核所有出处链接（需联网）"
 
 pipeline: validate stats dedup index report
@@ -28,6 +30,12 @@ index:
 
 report:
 	$(QBNK) report
+
+viz:
+	$(QBNK) viz
+
+serve: viz
+	$(PY) -m http.server 8000 -d site
 
 verify:
 	$(QBNK) verify-sources

@@ -1,0 +1,31 @@
+name: papers-pdf
+
+on:
+  push:
+    paths:
+      - ".github/workflows/papers-pdf.yml"
+      - "latex/**"
+      - "scripts/pdf/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install TeX Live + fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            texlive-xetex texlive-latex-recommended texlive-latex-extra texlive-science \
+            texlive-fonts-recommended texlive-lang-chinese texlive-pictures texlive-plain-generic \
+            latexmk fonts-noto-cjk fonts-liberation fonts-stix fonts-asana-math fontconfig ghostscript poppler-utils
+      - name: Fonts available
+        run: |
+          fc-list : family | grep -iE "stix|asana|gyre|noto (serif|sans) cjk sc|fandol|liberation serif|latin modern math" | sort -u | head -60
+          kpsewhich tabularray.sty tcolorbox.sty pgfplots.sty ctex.sty
+      - name: Clone math sources
+        run: git clone --depth 1 https://github.com/DxAThing/Gaokao-Math-Problems-Compilation.git dx && git -C dx rev-parse HEAD

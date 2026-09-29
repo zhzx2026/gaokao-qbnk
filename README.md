@@ -73,9 +73,12 @@ python3 -m tools.qbnk.cli index                 # 生成 data/index/*.json
 python3 -m tools.qbnk.cli report                # 生成 reports/*.md
 python3 -m tools.qbnk.cli verify-sources        # 复核所有出处链接是否还活着（需联网）
 python3 -m tools.qbnk.cli check-staging         # 检查 data/staging/ 适配器产出是否可复核
+python3 -m tools.qbnk.cli viz                   # 生成可视化看板 site/index.html（自包含，双击即可打开）
 ```
 
 一条命令跑完：`make pipeline`（等价于 validate → stats → dedup → index → report）。
+
+可视化看板：`make serve` 后打开 <http://localhost:8000>（或直接打开 `site/index.html`）——覆盖度热力图、来源/核验分布、作文题浏览、试卷档案检索、来源登记与"野题闸门"。修改数据后重新运行 `make viz` 刷新。
 
 ## 五、采集适配器
 
