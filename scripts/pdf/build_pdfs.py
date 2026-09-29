@@ -75,6 +75,22 @@ def slug(s: str) -> str:
     return re.sub(r"[^0-9A-Za-z_.-]+", "_", s).strip("_")
 
 
+_SLUG = [("未标注卷别", "unk"), ("全国", "qg"), ("新课标", "xkb"), ("新高考", "xgk"), ("甲", "jia"), ("乙", "yi"),
+         ("上海", "sh"), ("北京", "bj"), ("天津", "tj"), ("浙江", "zj"), ("理科", "-li"), ("文科", "-wen"),
+         ("卷", ""), ("（", "-"), ("）", "")]
+
+
+def paper_slug(name: str) -> str:
+    t = name
+    for a, b in _SLUG:
+        t = t.replace(a, b)
+    leftover = bool(re.search(r"[^\x00-\x7f]", t))
+    t = re.sub(r"[^0-9A-Za-z-]+", "", t).strip("-")
+    if leftover or not t:
+        t = (t + "-" if t else "") + hashlib.sha1(name.encode()).hexdigest()[:5]
+    return t
+
+
 def sha256(p: Path) -> str:
     h = hashlib.sha256()
     with p.open("rb") as f:
@@ -129,7 +145,7 @@ def colophon(kind: str, src: dict, extra: str, rev: str) -> str:
         f"\\textbf{{来源}}：{tex_text(src['name'])}（{tex_text(src['url'])}，版本 {rev}）\\par"
         f"\\textbf{{许可}}：{tex_text(src['license'])}；{tex_text(src['upstream'])}\\par"
         f"{extra}"
-        "\\textbf{编译}：gaokao-qbnk（\\texttt{github.com/zhzx2026/gaokao-qbnk}）用 XeLaTeX 统一编译；"
+        "\\textbf{编译}：gaokao-qbnk 项目（github.com/zhzx2026/gaokao-qbnk）用 XeLaTeX 统一编译；"
         "如发现错漏请以原卷为准并提 issue。\\par\\endgroup\n"
     )
 
@@ -194,7 +210,7 @@ def prep_physics(work: Path, args) -> list[dict]:
                 f"\\textbf{{卷别}} & {tex_text(p['paper'])}\\\\ \\textbf{{地区}} & {tex_text(p.get('region') or '')}\\\\ "
                 f"\\textbf{{原卷 SHA-256}} & \\texttt{{\\scriptsize {p['artifact'].get('sha256', '')[:32]}…}}\\end{{tabular}}\\end{{center}}\n")
         tex = (
-            "\\documentclass[12pt, oneside, UTF8]{ctexbook}\n\\input{styles_qbnk.tex}\n\\usepackage{pdfpages}\n"
+            "\\documentclass[12pt, oneside, UTF8]{ctexbook}\n\\input{styles_qbnk.tex}\n\\tallpagefalse\n\\usepackage{pdfpages}\n"
             "\\begin{document}\n\\mainmatter\n"
             f"\\examyear{{{year}年}}%\n\\chapter{{{tex_text(title)}（原卷）}}\n{info}"
             + colophon("archive", SOURCES["gaokaophysics"], "", rev)
@@ -304,7 +320,7 @@ def render_problem(r: dict) -> str:
     sp = split_options(q) if r["kind"] == "选择题" else None
     if sp:
         stem, opts = sp
-        body = tex_text(stem) + "\n\n\\choices\n" + "".join(f"  {{{tex_text(o)}}}\n" for o in opts)
+        body = tex_text(stem) + "\n\n\\choices\n" + "".join("  {" + re.sub(r"\s*\n\s*", " ", tex_text(o)).strip() + "}\n" for o in opts)
     else:
         body = tex_text(q)
     out = f"\\begin{{problem}}\n{body}\n\\end{{problem}}\n\n"
@@ -343,7 +359,7 @@ def prep_excerpt(work: Path, args) -> list[dict]:
         for edition, showans in (("试题", False), ("解析", True)):
             if showans and not any(r["answer"] or r["analysis"].strip() for r in rs):
                 continue
-            jid = f"{SUBJECT_CODE[subj]}-{year}-{slug(paper)}-x{'a' if showans else 'q'}"
+            jid = f"{SUBJECT_CODE[subj]}-{year}-{paper_slug(paper)}-x{'a' if showans else 'q'}"
             title = f"{year}年 {paper} {subj}（节选）"
             parts = [f"\\chapter{{{tex_text(title)}}}\n"]
             total = sum(float(r["score"] or 0) for r in rs)
@@ -443,23 +459,43 @@ def cmd_compile(args) -> int:
 
 
 def cmd_merge(args) -> int:
-    res_dir, out = Path(args.results), Path(args.out)
+    """全量 PDF 打成 dist/*.zip（发 Release）；仓库里只留 >= repo_min_year 的整卷/节选卷 + 完整清单。"""
+    import zipfile
+    res_dir, out, dist = Path(args.results), Path(args.out), Path(args.dist)
     allr = []
     for f in sorted(res_dir.rglob("results-*.json")):
         allr += json.loads(f.read_text(encoding="utf-8"))
-    for f in res_dir.rglob("pdf/*/*/*.pdf"):
-        dest = out / f.relative_to(f.parents[2])
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(f, dest)
-    keep = ["id", "kind", "subject", "year", "title", "edition", "ok", "path", "size", "pages", "sha256",
+    repo_kinds = set(args.repo_kinds.split(","))
+    dist.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
+    zips: dict[str, zipfile.ZipFile] = {}
+    for r in allr:
+        if not r["ok"]:
+            continue
+        src = next(res_dir.rglob(f"pdf/{r['path']}"), None)
+        if src is None:
+            r["ok"] = False
+            r["error"] = "artifact missing"
+            continue
+        zname = f"gaokao-pdf-{r['kind']}-{SUBJECT_CODE[r['subject']]}.zip"
+        z = zips.get(zname) or zips.setdefault(zname, zipfile.ZipFile(dist / zname, "w", zipfile.ZIP_STORED))
+        z.write(src, r["path"])
+        r["zip"] = zname
+        r["in_repo"] = r["year"] >= args.repo_min_year and r["kind"] in repo_kinds
+        if r["in_repo"]:
+            dest = out / r["path"]
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, dest)
+    for z in zips.values():
+        z.close()
+    keep = ["id", "kind", "subject", "year", "title", "edition", "ok", "path", "size", "pages", "sha256", "in_repo", "zip",
             "source", "source_rev", "source_path", "n_questions", "seconds"]
     man = [{k: r[k] for k in keep if k in r} for r in sorted(allr, key=lambda r: (r["subject"], r["year"], r["id"]))]
-    out.mkdir(parents=True, exist_ok=True)
     (out / "manifest.json").write_text(json.dumps(
-        {"sources": SOURCES, "papers": man}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        {"sources": SOURCES, "release_tag": args.release_tag, "papers": man}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     bad = [r for r in allr if not r["ok"]]
     (out / "failed.txt").write_text("\n".join(f"{r['id']}\n{r.get('error', '')}\n" for r in bad), encoding="utf-8")
-    print(f"total {len(allr)}  ok {len(allr) - len(bad)}  failed {len(bad)}")
+    print(f"total {len(allr)}  ok {len(allr) - len(bad)}  failed {len(bad)}  in_repo {sum(1 for r in allr if r.get('in_repo'))}")
     return 0
 
 
@@ -471,6 +507,8 @@ def main() -> int:
     p = sub.add_parser("compile"); p.add_argument("--work", required=True); p.add_argument("--shard", default="0/1")
     p.add_argument("--results", required=True); p.add_argument("--timeout", type=int, default=600); p.set_defaults(fn=cmd_compile)
     p = sub.add_parser("merge"); p.add_argument("--results", required=True); p.add_argument("--out", required=True)
+    p.add_argument("--dist", default="dist"); p.add_argument("--repo-min-year", type=int, default=2024)
+    p.add_argument("--repo-kinds", default="typeset,excerpt"); p.add_argument("--release-tag", default="pdf-latest")
     p.set_defaults(fn=cmd_merge)
     a = ap.parse_args()
     return a.fn(a)

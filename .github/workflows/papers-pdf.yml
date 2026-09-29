@@ -19,17 +19,29 @@ permissions:
   contents: write
 
 env:
-  # 试点期：只编译这一年。全量时改成空串。
+  # 试点期：只编译这一年（留空 = 2000 年以后全部）。
   ONLY_YEAR: ${{ github.event.inputs.only_year || '2024' }}
-  SHARDS: 3
 
 jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      shards: ${{ steps.p.outputs.shards }}
+      n: ${{ steps.p.outputs.n }}
+    steps:
+      - id: p
+        run: |
+          if [ -n "$ONLY_YEAR" ]; then N=3; else N=14; fi
+          echo "n=$N" >> "$GITHUB_OUTPUT"
+          echo "shards=$(python3 -c "import json;print(json.dumps(list(range($N))))")" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: plan
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2]
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
     steps:
       - uses: actions/checkout@v4
       - name: Install TeX Live + fonts
@@ -53,7 +65,7 @@ jobs:
           python3 scripts/pdf/build_pdfs.py prepare --work work $ARGS | tee /tmp/prepare.txt
       - name: Compile
         run: |
-          python3 scripts/pdf/build_pdfs.py compile --work work --shard ${{ matrix.shard }}/$SHARDS --results results 2>&1 | tee /tmp/compile.txt
+          python3 scripts/pdf/build_pdfs.py compile --work work --shard ${{ matrix.shard }}/${{ needs.plan.outputs.n }} --results results 2>&1 | tee /tmp/compile.txt
           du -sh results/pdf || true
       - uses: actions/upload-artifact@v4
         with:
@@ -78,13 +90,22 @@ jobs:
           path: shards
       - name: Merge + commit
         run: |
-          python3 scripts/pdf/build_pdfs.py merge --results shards --out pdf | tee /tmp/merge.txt
-          du -sh pdf | tee -a /tmp/merge.txt
+          python3 scripts/pdf/build_pdfs.py merge --results shards --out pdf --dist dist --repo-min-year 2024 --release-tag pdf-latest | tee /tmp/merge.txt
+          du -sh pdf dist | tee -a /tmp/merge.txt
           git config user.name "qbnk-bot"; git config user.email "qbnk-bot@users.noreply.github.com"
-          git add pdf
+          git add -A pdf
           git commit -m "pdf: 编译产物 $(date -u +%F) [skip ci]" || echo "nothing to commit"
           git pull --rebase -q origin ${{ github.ref_name }} || true
           git push origin HEAD:${{ github.ref_name }}
+      - name: Publish full PDF set as a release
+        if: env.ONLY_YEAR == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete pdf-latest -y --cleanup-tag || true
+          gh release create pdf-latest dist/*.zip --target "$(git rev-parse HEAD)" \
+            --title "高考试卷 PDF 全集（XeLaTeX 统一编译）" \
+            --notes "由 papers-pdf workflow 编译。zip 内路径与 pdf/manifest.json 的 path 一致；数学为整卷重排（CC BY-SA 4.0），其它学科为节选卷，物理为原卷套版。" 2>&1 | tee -a /tmp/merge.txt
       - name: Diagnostics
         if: always()
         run: python3 scripts/pdf/diag.py /tmp/merge.txt pdf/failed.txt
