@@ -34,3 +34,15 @@
 
 本仓库提供的数据**按"现状"提供**，不对准确性、完整性、适用性作任何担保。
 使用者应自行核验关键内容；因使用本仓库数据造成的任何后果，由使用者自行承担。
+
+## 5. 试卷 PDF（`pdf/`）的许可
+
+`pdf/` 下由 CI 用 XeLaTeX 编译出来的试卷 PDF 是**改编作品**，各文件末尾都写明了来源和许可：
+
+| 类型 | 上游 | 许可 |
+| --- | --- | --- |
+| 数学整卷重排（`typeset`） | [DxAThing/Gaokao-Math-Problems-Compilation](https://github.com/DxAThing/Gaokao-Math-Problems-Compilation) → [deekur/gaokaomath](https://github.com/deekur/gaokaomath) | **CC BY-SA 4.0**（须署名并以相同方式共享）；题源 CC BY 4.0 |
+| 其它学科节选卷（`excerpt`） | [OpenLMLab/GAOKAO-Bench](https://github.com/OpenLMLab/GAOKAO-Bench)、本库作文题 | Apache-2.0（数据整理） |
+| 物理原卷套版（`archive`） | [deekur/gaokaophysics](https://github.com/deekur/gaokaophysics) | CC BY 4.0 |
+
+无论哪种，**试题本身的著作权仍归命题机构**；PDF 里的 OCR 整理数据（`excerpt`）尚未逐题二次校对，请以原卷为准。
