@@ -125,9 +125,14 @@ def _table(lines: list[str]) -> str:
             "\\end{tabular}\\end{center}\n\n")
 
 
+_SAFE = False   # 保底模式：不识别数学/表格，全部按普通文本转义（公式保持 $..$ 原样可见）
+
+
 def tex_text(s: str) -> str:
     """普通文本转义；$...$ 数学原样保留（统一转成 \\( \\)）；Markdown 表格转 tabular。"""
     s = re.sub(r"<br\s*/?>", " ", (s or "").replace("\r", ""))
+    if _SAFE:
+        return _plain(s)
     if re.search(r"(?m)^\s*\|", s):
         out, buf = [], []
         for l in s.split("\n"):
@@ -150,13 +155,23 @@ def tex_text(s: str) -> str:
         if text_lines:
             res.append(tex_text("\n".join(text_lines)))
         return "".join(res)
-    out, pos = [], 0
-    for m in _MATH.finditer(s):
-        out.append(_plain(s[pos:m.start()]))
+    out, pos, at = [], 0, 0
+    while True:
+        m = _MATH.search(s, at)
+        if not m:
+            break
         body = next(g for g in m.groups() if g is not None).strip()
+        bare = re.sub(r"\\(?:text|mathrm|mbox)\{[^{}]*\}", "", body)
+        bad = (re.search(r"[\u4e00-\u9fff]{3,}|_{3,}", bare)
+               or (re.search(r"(?<!\\)&", bare) and "\\begin" not in bare)
+               or ("\n\n" in body and len(body) > 200))
+        if bad and m.group(0).startswith("$"):
+            at = m.start() + 1          # 误配的美元符号（价格等）：当普通字符，从下一个字符重新找
+            continue
+        out.append(_plain(s[pos:m.start()]))
         display = m.group(1) is not None or m.group(4) is not None
         out.append(("\\[" + body + "\\]") if display else ("\\(" + body + "\\)"))
-        pos = m.end()
+        pos = at = m.end()
     out.append(_plain(s[pos:]))
     return "".join(out)
 
@@ -397,33 +412,44 @@ def prep_excerpt(work: Path, args) -> list[dict]:
                 continue
             jid = f"{SUBJECT_CODE[subj]}-{year}-{paper_slug(paper)}-x{'a' if showans else 'q'}"
             title = f"{year}年 {paper} {subj}（节选）"
-            parts = [f"\\chapter{{{tex_text(title)}}}\n"]
-            total = sum(float(r["score"] or 0) for r in rs)
-            parts.append(
-                f"\\begin{{center}}\\small 本卷为题库\\textbf{{节选卷}}，仅含已收录的 {len(rs)} 道题"
-                f"{'，共 %g 分' % total if total else ''}；不是完整试卷，题号为本卷序号。\\end{{center}}\n")
-            cur = None
-            for r in rs:
-                if r["kind"] != cur:
-                    cur = r["kind"]
-                    parts.append(f"\\section{{{cur}}}\n\n")
-                parts.append(render_problem(r))
             src_key = "qbnk" if all(r["repo"] == "qbnk" for r in rs) else "gaokao-bench"
-            body = "".join(parts)
-            tex = (
-                "\\documentclass[12pt, oneside, UTF8]{ctexbook}\n\\input{styles_qbnk.tex}\n"
-                f"\\show{'answertrue' if showans else 'answerfalse'}\n\\tallpagefalse\n"
-                "\\begin{document}\n\\mainmatter\n"
-                f"\\examyear{{{year}年}}%\n{body}"
-                + colophon("excerpt", SOURCES[src_key],
-                           "\\textbf{校对状态}：来源为 OCR 整理的结构化数据，尚未逐题二次校对，公式/选项可能有误，请以原卷为准。\\par"
-                           if src_key == "gaokao-bench" else "", "main")
-                + "\\end{document}\n"
-            )
-            (dx / "_qbnk" / f"{jid}.tex").write_text(tex, encoding="utf-8")
+
+            def build(safe: bool) -> str:
+                global _SAFE
+                _SAFE = safe
+                try:
+                    parts = [f"\\chapter{{{tex_text(title)}}}\n"]
+                    total = sum(float(r["score"] or 0) for r in rs)
+                    parts.append(
+                        f"\\begin{{center}}\\small 本卷为题库\\textbf{{节选卷}}，仅含已收录的 {len(rs)} 道题"
+                        f"{'，共 %g 分' % total if total else ''}；不是完整试卷，题号为本卷序号。\\end{{center}}\n")
+                    cur = None
+                    for r in rs:
+                        if r["kind"] != cur:
+                            cur = r["kind"]
+                            parts.append(f"\\section{{{cur}}}\n\n")
+                        parts.append(render_problem(r))
+                    body = "".join(parts)
+                finally:
+                    _SAFE = False
+                note = ("\\textbf{校对状态}：来源为 OCR 整理的结构化数据，尚未逐题二次校对，公式/选项可能有误，请以原卷为准。\\par"
+                        if src_key == "gaokao-bench" else "")
+                if safe:
+                    note += "\\textbf{排版说明}：本卷公式/表格无法自动排版，按原始文本呈现。\\par"
+                return (
+                    "\\documentclass[12pt, oneside, UTF8]{ctexbook}\n\\input{styles_qbnk.tex}\n"
+                    '\\xeCJKDeclareCharClass{CJK}{"2460->"24FF}\n'   # 带圈数字 ①②… 走 CJK 字体
+                    f"\\show{'answertrue' if showans else 'answerfalse'}\n\\tallpagefalse\n"
+                    "\\begin{document}\n\\mainmatter\n"
+                    f"\\examyear{{{year}年}}%\n{body}"
+                    + colophon("excerpt", SOURCES[src_key], note, "main")
+                    + "\\end{document}\n")
+
+            (dx / "_qbnk" / f"{jid}.tex").write_text(build(False), encoding="utf-8")
+            (dx / "_qbnk" / f"{jid}.safe.tex").write_text(build(True), encoding="utf-8")
             jobs.append({"id": jid, "kind": "excerpt", "subject": subj, "year": year, "title": title,
                          "edition": "解析" if showans else "试题", "cwd": "dx", "tex": f"_qbnk/{jid}.tex",
-                         "source": src_key, "source_rev": "main", "n_questions": len(rs)})
+                         "tex_safe": f"_qbnk/{jid}.safe.tex", "source": src_key, "source_rev": "main", "n_questions": len(rs)})
     return jobs
 
 
@@ -461,15 +487,22 @@ def cmd_compile(args) -> int:
         t0 = time.time()
         outdir = cwd / "_out" / j["id"]
         outdir.mkdir(parents=True, exist_ok=True)
-        cmd = ["latexmk", "-xelatex", "-interaction=nonstopmode", "-halt-on-error", "-file-line-error",
-               f"-outdir={outdir}", "-e", '$xelatex = "xelatex -cnf-line=extra_mem_bot=10000000 %O %S"', j["tex"]]
-        try:
-            r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=args.timeout)
-            ok = r.returncode == 0
-        except subprocess.TimeoutExpired:
-            ok = False
-        pdf = outdir / (Path(j["tex"]).stem + ".pdf")
-        rec = dict(j, seconds=round(time.time() - t0, 1), ok=ok and pdf.exists())
+        ok, used_tex = False, j["tex"]
+        for used_tex in [j["tex"]] + ([j["tex_safe"]] if j.get("tex_safe") else []):
+            cmd = ["latexmk", "-xelatex", "-interaction=nonstopmode", "-halt-on-error", "-file-line-error",
+                   f"-outdir={outdir}", "-e", '$xelatex = "xelatex -cnf-line=extra_mem_bot=10000000 %O %S"', used_tex]
+            try:
+                r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=args.timeout)
+                ok = r.returncode == 0
+            except subprocess.TimeoutExpired:
+                ok = False
+            if ok:
+                break
+            if j.get("tex_safe") and used_tex == j["tex"]:
+                print(f"RETRY(safe) {j['id']}", flush=True)
+                shutil.rmtree(outdir, ignore_errors=True); outdir.mkdir(parents=True, exist_ok=True)
+        pdf = outdir / (Path(used_tex).stem + ".pdf")
+        rec = dict(j, seconds=round(time.time() - t0, 1), ok=ok and pdf.exists(), safe_mode=used_tex != j["tex"])
         if rec["ok"]:
             dest = res_dir / "pdf" / SUBJECT_CODE[j["subject"]] / str(j["year"]) / f"{j['id']}.pdf"
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -477,7 +510,7 @@ def cmd_compile(args) -> int:
             rec.update(path=f"{SUBJECT_CODE[j['subject']]}/{j['year']}/{j['id']}.pdf", size=dest.stat().st_size,
                        pages=pdf_pages(dest), sha256=sha256(dest))
         else:
-            logf = outdir / (Path(j["tex"]).stem + ".log")
+            logf = outdir / (Path(used_tex).stem + ".log")
             tail = ""
             if logf.exists():
                 lines = logf.read_text(errors="replace").splitlines()
@@ -541,7 +574,7 @@ def main() -> int:
     p = sub.add_parser("prepare"); p.add_argument("--work", required=True)
     p.add_argument("--only-year", type=int); p.add_argument("--limit", type=int); p.set_defaults(fn=cmd_prepare)
     p = sub.add_parser("compile"); p.add_argument("--work", required=True); p.add_argument("--shard", default="0/1")
-    p.add_argument("--results", required=True); p.add_argument("--timeout", type=int, default=600); p.set_defaults(fn=cmd_compile)
+    p.add_argument("--results", required=True); p.add_argument("--timeout", type=int, default=1500); p.set_defaults(fn=cmd_compile)
     p = sub.add_parser("merge"); p.add_argument("--results", required=True); p.add_argument("--out", required=True)
     p.add_argument("--dist", default="dist"); p.add_argument("--repo-min-year", type=int, default=2024)
     p.add_argument("--repo-kinds", default="typeset,excerpt"); p.add_argument("--release-tag", default="pdf-latest")

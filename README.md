@@ -102,6 +102,26 @@ python3 sources/adapters/gaokaomath_papers.py --repo /tmp/gaokaomath \
 python3 -m tools.qbnk.cli validate
 ```
 
+## 五点五、试卷 PDF（XeLaTeX 统一编译）
+
+2000 年以后的试卷全部用同一套版式（字体/页面/题号/选项/答案框/页眉）编译成 PDF，脚本在
+[`scripts/pdf/build_pdfs.py`](scripts/pdf/build_pdfs.py)，由 [`papers-pdf`](.github/workflows/papers-pdf.yml) 在 Actions 里跑
+（沙箱和多数本机没有完整 TeX Live；CI 里 `apt` 装好后分片并行编译）。
+
+| 类型 | 学科 | 内容 | 版本 | 说明 |
+| --- | --- | --- | --- | --- |
+| `typeset` 整卷重排 | 数学（2000-2026，约 610 份） | **完整试卷**，LaTeX 源码重排 | 试题版 + 答案解析版 | 源自 [DxAThing/Gaokao-Math-Problems-Compilation](https://github.com/DxAThing/Gaokao-Math-Problems-Compilation)（CC BY-SA 4.0），含新高考 I/II 卷、全国甲乙卷、各省自主命题卷 |
+| `archive` 原卷套版 | 物理（2000-2026） | 上游原卷影印页 + 统一封面/页眉页脚 | 原卷 | 题目正文尚未转写成 LaTeX，只统一了版式 |
+| `excerpt` 节选卷 | 语文、英语、化学、生物、政治、历史、地理 | 题库里**已有的部分**题目 | 试题版 / 解析版 | ⚠️ 不是完整试卷。来源 GAOKAO-Bench 是 OCR 整理，未逐题二次校对；语文含本库自己的作文题 |
+
+产物：`pdf/manifest.json` 是全量清单（sha256、页数、来源版本）。为控制仓库体积，`pdf/` 里只提交 2024 年及以后的整卷/节选卷；
+**全集**作为 GitHub Release `pdf-latest` 的 zip 发布（`gaokao-pdf-<类型>-<学科>.zip`）。可视化看板的「试卷 PDF」一栏可直接检索。
+
+```bash
+python3 scripts/pdf/build_pdfs.py prepare --work work [--only-year 2024]   # 需要先把上游仓库克隆到 work/{dx,gaokaophysics,gkb,gku}
+python3 scripts/pdf/build_pdfs.py compile --work work --results results     # 需要 xelatex + latexmk + 中文字体
+```
+
 ## 六、用 GitHub Actions 跑采集（不用自己开机器）
 
 需要联网的采集全部放在 Actions 上，跑完自动开 PR 等人复核，`data/questions/` 永远只进人工看过的题。
