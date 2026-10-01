@@ -1,26 +1,68 @@
 {
-  "generated_at": "2026-09-29",
+  "generated_at": "2026-10-01",
   "results": [
     {
       "source_id": "dxsbb-zuowen",
       "url": "https://m.qz.bendibao.com/edu/38017.shtm",
-      "status": "unreachable",
-      "note": "URLError",
-      "checked_at": "2026-09-29"
+      "status": "ok",
+      "note": "200",
+      "checked_at": "2026-10-01"
     },
     {
       "source_id": "dxsbb-zuowen",
       "url": "https://www.dxsbb.com/news/116375.html",
-      "status": "unreachable",
-      "note": "URLError",
-      "checked_at": "2026-09-29"
+      "status": "ok",
+      "note": "200",
+      "checked_at": "2026-10-01"
     },
     {
       "source_id": "dxsbb-zuowen",
       "url": "https://www.dxsbb.com/news/116376.html",
-      "status": "unreachable",
-      "note": "URLError",
-      "checked_at": "2026-09-29"
+      "status": "ok",
+      "note": "200",
+      "checked_at": "2026-10-01"
+    },
+    {
+      "source_id": "dxsbb-zuowen",
+      "url": "https://www.dxsbb.com/news/136500.html",
+      "status": "ok",
+      "note": "200",
+      "checked_at": "2026-10-01"
+    },
+    {
+      "source_id": "dxsbb-zuowen",
+      "url": "https://www.dxsbb.com/news/99991.html",
+      "status": "ok",
+      "note": "200",
+      "checked_at": "2026-10-01"
+    },
+    {
+      "source_id": "eol-gkzx",
+      "url": "https://finance.sina.com.cn/jjxw/2026-06-07/doc-iniaqhwq9692727.shtml",
+      "status": "ok",
+      "note": "200",
+      "checked_at": "2026-10-01"
+    },
+    {
+      "source_id": "eol-gkzx",
+      "url": "https://m.qz.bendibao.com/edu/38017.shtm",
+      "status": "ok",
+      "note": "200",
+      "checked_at": "2026-10-01"
+    },
+    {
+      "source_id": "eol-gkzx",
+      "url": "https://news.bjd.com.cn/2026/06/07/11792203.shtml",
+      "status": "ok",
+      "note": "200",
+      "checked_at": "2026-10-01"
+    },
+    {
+      "source_id": "eol-gkzx",
+      "url": "https://www.eol.cn/kaoshi/gaokao/gkzx/202606/t20260607_2742041.shtml",
+      "status": "ok",
+      "note": "200",
+      "checked_at": "2026-10-01"
     }
   ]
 }
