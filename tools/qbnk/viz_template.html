@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>高考题库 · 可视化看板</title>
+<style>
+:root{
+  --bg:#f6f4ef; --card:#fff; --ink:#1d2129; --mute:#6b7280; --line:#e6e2d8;
+  --accent:#b8321f; --accent-soft:#f6e3df;
+  --t1:#1f9d55; --t2:#0e8f9c; --t3:#d99a1c; --t4:#c0392b;
+  --ok:#1f9d55; --warn:#d99a1c; --bad:#c0392b; --conf:#e0701a;
+  --heat0:#efece4; --shadow:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(60,40,20,.06);
+  --heat-rgb:184,50,31;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#14161a;--card:#1c1f25;--ink:#e8e6e1;--mute:#98a0ab;--line:#2c313a;--accent:#e2604b;--accent-soft:#3a201c;--heat0:#262a31;--shadow:none;--heat-rgb:226,96,75}
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:64px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+nav{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav .in{max-width:1180px;margin:auto;padding:10px 20px;display:flex;gap:6px;align-items:center;overflow-x:auto;white-space:nowrap}
+nav b{margin-right:12px;font-size:16px} nav b i{color:var(--accent);font-style:normal}
+nav a{color:var(--mute);padding:4px 10px;border-radius:999px;font-size:14px} nav a:hover{background:var(--accent-soft);color:var(--accent);text-decoration:none}
+main{max-width:1180px;margin:auto;padding:0 20px 80px}
+.hero{padding:44px 0 20px}
+.hero h1{margin:0 0 8px;font-size:34px;letter-spacing:.5px}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero p{margin:0;color:var(--mute);max-width:760px}
+section{margin-top:44px}
+h2{font-size:22px;margin:0 0 4px} .sub{color:var(--mute);margin:0 0 16px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px 20px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-top:24px}
+.kpi{padding:16px 18px}
+.kpi .n{font-size:32px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .l{color:var(--mute);font-size:13px;margin-top:4px}
+.kpi .d{font-size:12px;color:var(--mute);margin-top:6px;border-top:1px dashed var(--line);padding-top:6px}
+.kpi.acc .n{color:var(--accent)} .kpi.bad .n{color:var(--bad)} .kpi.ok .n{color:var(--ok)}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--card)}
+.seg button{border:0;background:none;padding:5px 14px;color:var(--mute);cursor:pointer;font:inherit;font-size:13px}
+.seg button.on{background:var(--accent);color:#fff}
+.bar{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+/* heatmap */
+.hm{overflow-x:auto;padding-bottom:6px}
+.hm-grid{display:grid;grid-template-columns:44px repeat(var(--cols),minmax(11px,1fr));gap:2px;min-width:860px;align-items:center}
+.hm-lab{font-size:12px;color:var(--mute);text-align:right;padding-right:6px}
+.hm-yr{font-size:10px;color:var(--mute);height:16px;position:relative}
+.hm-yr span{position:absolute;left:0;transform:translateX(-30%)}
+.hm-c{aspect-ratio:1;border-radius:3px;background:var(--heat0);position:relative;cursor:default}
+.hm-c.has{cursor:pointer}
+.hm-c.q::after{content:"";position:absolute;inset:auto 0 0 auto;width:5px;height:5px;border-radius:50%;background:#fff;border:1.5px solid var(--t2);transform:translate(30%,30%)}
+.hm-c:hover{outline:2px solid var(--ink);outline-offset:1px;z-index:2}
+.legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--mute);margin-top:12px}
+.legend .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+/* donut / bars */
+.chart-t{font-weight:600;margin-bottom:10px}
+.donut-wrap{display:flex;gap:16px;align-items:center}
+.donut{flex:none;width:130px;height:130px}
+.donut text{fill:var(--ink)}
+.lg{list-style:none;margin:0;padding:0;font-size:13px;flex:1}
+.lg li{display:flex;align-items:center;gap:8px;padding:2px 0;cursor:default}
+.lg .dot{width:10px;height:10px;border-radius:3px;flex:none}
+.lg .v{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--mute)}
+.hb{display:grid;grid-template-columns:70px 1fr 40px;gap:6px 8px;align-items:center;font-size:13px}
+.hb .t{background:var(--heat0);border-radius:4px;height:14px;overflow:hidden}
+.hb .t i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.hb .v{text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+/* pills */
+.pill{display:inline-block;font-size:12px;line-height:1;padding:3px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.s-verified{color:var(--ok)} .s-single_source{color:var(--warn)} .s-conflict{color:var(--conf)} .s-rejected{color:var(--bad)}
+.tier{display:inline-block;font-size:11px;font-weight:700;padding:2px 6px;border-radius:5px;color:#fff}
+.tier.T1{background:var(--t1)} .tier.T2{background:var(--t2)} .tier.T3{background:var(--t3)} .tier.T4{background:var(--t4)}
+/* filters */
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.filters select,.filters input{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);min-width:0}
+.filters input{flex:1;min-width:160px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:3px 12px;font:inherit;font-size:13px;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip small{opacity:.7;margin-left:4px}
+/* question cards */
+.qs{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.q{padding:16px 18px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:transform .12s}
+.q:hover{transform:translateY(-2px)}
+.q .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.q .yr{font-size:22px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+.q .pp{font-weight:600}
+.q .stem{color:var(--ink);opacity:.85;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;font-size:14px}
+.q .kp{display:flex;gap:6px;flex-wrap:wrap}
+.q .kp span{font-size:12px;background:var(--heat0);color:var(--mute);border-radius:5px;padding:1px 7px}
+.empty{color:var(--mute);text-align:center;padding:30px}
+/* modal */
+dialog{border:0;border-radius:16px;padding:0;max-width:760px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(10,10,15,.55);backdrop-filter:blur(2px)}
+.m-h{padding:18px 24px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:start}
+.m-h h3{margin:0;font-size:18px} .m-h button{border:0;background:none;font-size:24px;line-height:1;color:var(--mute);cursor:pointer}
+.m-b{padding:16px 24px 22px;max-height:70vh;overflow:auto}
+.m-b h4{margin:18px 0 6px;font-size:13px;color:var(--mute);text-transform:none;letter-spacing:1px}
+.m-b .stem{white-space:pre-wrap;background:var(--bg);border-radius:10px;padding:12px 14px;font-size:14.5px}
+.m-b ul{margin:0;padding-left:18px}
+/* table */
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;color:var(--mute);font-weight:500;font-size:12.5px;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;white-space:nowrap}
+.tbl th.on{color:var(--accent)}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--line)}
+.tbl tr:hover td{background:var(--heat0)}
+.tw{overflow-x:auto}
+.pager{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:12px;font-size:13px;color:var(--mute)}
+.pager button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:4px 12px;cursor:pointer;font:inherit}
+.pager button:disabled{opacity:.4;cursor:default}
+/* sources */
+.srcs{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.src{padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.src .nm{font-weight:600;font-size:14px}
+.src .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--mute)}
+/* gate */
+.gate{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:stretch}
+.gate .arrow{align-self:center;font-size:28px;color:var(--mute)}
+.gate .col{padding:16px 18px}
+.gate .num{font-size:30px;font-weight:700}
+.gate .rules{font-size:13px;color:var(--mute);margin:8px 0 0;padding-left:18px}
+@media(max-width:760px){.gate{grid-template-columns:1fr}.gate .arrow{transform:rotate(90deg);text-align:center}.hero h1{font-size:26px}}
+#tip{position:fixed;pointer-events:none;z-index:50;background:#111;color:#fff;font-size:12.5px;padding:6px 10px;border-radius:8px;opacity:0;transition:opacity .1s;max-width:260px;line-height:1.5}
+footer{margin-top:60px;color:var(--mute);font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+<nav><div class="in">
+  <b>高考<i>题库</i></b>
+  <a href="#coverage">覆盖度</a><a href="#quality">来源与核验</a><a href="#questions">题目浏览</a>
+  <a href="#pdfs">试卷 PDF</a><a href="#papers">试卷档案</a><a href="#sources">来源登记</a><a href="#gate">野题闸门</a>
+</div></nav>
+
+<main>
+  <div class="hero">
+    <h1>高考题库 · <em>可视化看板</em></h1>
+    <p>每条题目都必须能回答：谁发的？在哪？什么时候抓的？——这个页面把题库的覆盖度、来源等级和核验状态摊开给你看，来源查不到的一律不进库。</p>
+    <div class="kpis" id="kpis"></div>
+  </div>
+
+  <section id="coverage">
+    <div class="bar"><div><h2>覆盖度矩阵</h2><p class="sub" style="margin:0">学科 × 年份，颜色深浅 = 该年收录的试卷数；右下角圆点 = 已录入题目正文。空白行就是缺口。点击格子可查看对应试卷。</p></div></div>
+    <div class="card"><div class="hm" id="heatmap"></div>
+      <div class="legend" id="hm-legend"></div></div>
+  </section>
+
+  <section id="quality">
+    <div class="bar"><div><h2>来源与核验</h2><p class="sub" style="margin:0">来源分 T1–T4；<code>verified</code> 需要 ≥2 个互相独立的出处。</p></div>
+      <div class="seg" id="scope"><button data-v="questions" class="on">题目</button><button data-v="papers">试卷</button></div></div>
+    <div class="grid3">
+      <div class="card"><div class="chart-t">来源等级</div><div id="c-tier"></div></div>
+      <div class="card"><div class="chart-t">核验状态</div><div id="c-status"></div></div>
+      <div class="card"><div class="chart-t">地区分布（Top 12）</div><div id="c-region"></div></div>
+    </div>
+  </section>
+
+  <section id="questions">
+    <h2>题目浏览</h2>
+    <p class="sub">已入库的历年高考作文题。点击卡片看完整题干、命题思路和出处。</p>
+    <div class="chips" id="q-years"></div>
+    <div class="filters">
+      <select id="q-region"></select><select id="q-status"></select>
+      <input id="q-search" type="search" placeholder="搜索题干 / 卷别 / 关键词…">
+    </div>
+    <div class="qs" id="q-list"></div>
+  </section>
+
+  <section id="pdfs">
+    <h2>试卷 PDF</h2>
+    <p class="sub">全部由 XeLaTeX 用同一套版式编译。<b>整卷重排</b>＝完整试卷（含试题版和答案解析版）；<b>节选卷</b>＝题库里已有的部分题目，不是完整试卷；<b>原卷套版</b>＝原卷影印页加统一封面和页眉页脚，题目正文尚未转写。</p>
+    <div class="kpis" id="pdf-kpis" style="margin:0 0 14px"></div>
+    <div class="filters">
+      <select id="f-kind"></select><select id="f-subj"></select><select id="f-ed"></select><select id="f-yr"></select>
+      <input id="f-q" type="search" placeholder="搜索卷别，如 新高考、全国甲卷、北京…">
+    </div>
+    <div class="card"><div class="tw"><table class="tbl"><thead><tr><th>年份</th><th>学科</th><th>试卷</th><th>类型</th><th>版本</th><th>页数</th><th>大小</th><th>下载</th></tr></thead><tbody id="f-body"></tbody></table></div>
+      <div class="pager"><span id="f-count"></span><span><button id="f-prev">上一页</button> <span id="f-page"></span> <button id="f-next">下一页</button></span></div></div>
+  </section>
+
+  <section id="papers">
+    <h2>试卷档案</h2>
+    <p class="sub">已登记的试卷索引（含外部原卷 PDF 档案，只登记位置与校验值，不复制文件）。</p>
+    <div class="filters">
+      <select id="p-subject"></select><select id="p-region"></select><select id="p-system"></select>
+      <input id="p-search" type="search" placeholder="按年份 / 卷别搜索，如 2018、乙卷…">
+    </div>
+    <div class="card"><div class="tw"><table class="tbl"><thead id="p-head"></thead><tbody id="p-body"></tbody></table></div>
+      <div class="pager"><span id="p-count"></span><span><button id="p-prev">上一页</button> <span id="p-page"></span> <button id="p-next">下一页</button></span></div></div>
+  </section>
+
+  <section id="sources">
+    <h2>来源登记表</h2>
+    <p class="sub" id="tier-defs"></p>
+    <div class="srcs" id="src-list"></div>
+  </section>
+
+  <section id="gate">
+    <h2>野题闸门</h2>
+    <p class="sub">T4 来源与无出处的记录进不了正式库，只能待在隔离区等核验。</p>
+    <div class="gate" id="gate-body"></div>
+  </section>
+
+  <footer id="foot"></footer>
+</main>
+
+<dialog id="dlg"><div class="m-h"><h3 id="dlg-t"></h3><button id="dlg-x" aria-label="关闭">×</button></div><div class="m-b" id="dlg-b"></div></dialog>
+<div id="tip"></div>
+
+<script>
+const D = /*__QBNK_DATA__*/null;
+</script>
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const h = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v;
+    else if (k === "html") e.innerHTML = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat()) if (k != null) e.append(k.nodeType ? k : document.createTextNode(k));
+  return e;
+};
+const count = (arr, f) => arr.reduce((m, x) => { const k = f(x); m[k] = (m[k] || 0) + 1; return m; }, {});
+const STATUS = {verified: "已双源核验", single_source: "单一来源", conflict: "冲突待裁决", rejected: "已拒绝"};
+const STATUS_COLOR = {verified: "var(--ok)", single_source: "var(--warn)", conflict: "var(--conf)", rejected: "var(--bad)"};
+const TIER_COLOR = {T1: "var(--t1)", T2: "var(--t2)", T3: "var(--t3)", T4: "var(--t4)"};
+const TIER_NAME = {T1: "T1 官方", T2: "T2 授权媒体", T3: "T3 教育媒体/开放数据", T4: "T4 社区/UGC"};
+const SUBJECTS = ["语文", "数学", "英语", "物理", "化学", "生物", "政治", "历史", "地理"];
+const tip = $("#tip");
+function showTip(e, html) {
+  tip.innerHTML = html; tip.style.opacity = 1;
+  const w = tip.offsetWidth, x = Math.min(e.clientX + 14, innerWidth - w - 8);
+  tip.style.left = x + "px"; tip.style.top = (e.clientY + 16) + "px";
+}
+const hideTip = () => tip.style.opacity = 0;
+const statusPill = s => h("span", {class: "pill s-" + s}, STATUS[s] || s);
+const tierBadge = t => h("span", {class: "tier " + t}, t);
+
+/* ---------------- KPIs ---------------- */
+const Q = D.questions, P = D.papers;
+const archive = P.filter(p => p.nq === 0);
+const verifiedN = [...Q, ...P].filter(x => x.status === "verified").length;
+const yrs = P.map(p => p.year).filter(Boolean);
+$("#kpis").append(
+  ...[
+    ["acc", Q.length, "已入库题目", `${Q.filter(q => q.status === "verified").length} 条双源核验 · ${Q.filter(q => q.status === "single_source").length} 条单源`],
+    ["", P.length, "登记试卷", `${P.length - archive.length} 份含题目 · ${archive.length} 份仅档案索引`],
+    ["", Math.min(...yrs) + "–" + Math.max(...yrs), "时间跨度", `${new Set(yrs).size} 个年份有记录`],
+    ["", new Set(P.map(p => p.subject)).size + " / " + SUBJECTS.length, "已覆盖学科", [...new Set(P.map(p => p.subject))].join("、")],
+    ["ok", (verifiedN / (Q.length + P.length) * 100).toFixed(1) + "%", "双源核验率", `${verifiedN} / ${Q.length + P.length} 条记录`],
+    ["bad", D.quarantine.total, "隔离区（拒收）", "T4 来源，未核对不得使用"],
+  ].map(([c, n, l, d]) => h("div", {class: "card kpi " + c}, h("div", {class: "n"}, n), h("div", {class: "l"}, l), h("div", {class: "d"}, d)))
+);
+
+/* ---------------- Heatmap ---------------- */
+(function () {
+  const y0 = Math.min(...yrs), y1 = Math.max(...yrs), n = y1 - y0 + 1;
+  const cnt = {}, qcnt = {};
+  for (const p of P) { const k = p.subject + "|" + p.year; cnt[k] = (cnt[k] || 0) + 1; if (p.nq) qcnt[k] = (qcnt[k] || 0) + p.nq; }
+  const max = Math.max(...Object.values(cnt));
+  const g = h("div", {class: "hm-grid", style: `--cols:${n}`});
+  g.append(h("div"));
+  for (let y = y0; y <= y1; y++) g.append(h("div", {class: "hm-yr"}, y % 5 === 0 || y === y0 ? h("span", {}, String(y)) : null));
+  for (const s of SUBJECTS) {
+    const total = P.filter(p => p.subject === s).length;
+    g.append(h("div", {class: "hm-lab", title: total ? "" : "暂无收录"}, s));
+    for (let y = y0; y <= y1; y++) {
+      const k = s + "|" + y, c = cnt[k] || 0, qn = qcnt[k] || 0;
+      const cell = h("div", {class: "hm-c" + (c ? " has" : "") + (qn ? " q" : "")});
+      if (c) cell.style.background = `rgba(var(--heat-rgb),${(0.22 + 0.78 * c / max).toFixed(2)})`;
+      cell.addEventListener("mousemove", e => showTip(e, `<b>${y} · ${s}</b><br>${c ? `试卷 ${c} 份` + (qn ? `<br>已录入题目 ${qn} 条` : "") : "暂无收录"}`));
+      cell.addEventListener("mouseleave", hideTip);
+      if (c) cell.addEventListener("click", () => {
+        $("#p-subject").value = s; $("#p-region").value = ""; $("#p-system").value = "";
+        $("#p-search").value = String(y); pState.page = 0; renderPapers();
+        $("#papers").scrollIntoView();
+      });
+      g.append(cell);
+    }
+  }
+  $("#heatmap").append(g);
+  const lg = $("#hm-legend");
+  lg.append(h("span", {}, "试卷数："), h("span", {}, h("i", {class: "sw", style: "background:var(--heat0)"}), "0"));
+  for (const f of [0.25, 0.5, 1]) lg.append(h("span", {}, h("i", {class: "sw", style: `background:rgba(var(--heat-rgb),${0.22 + 0.78 * f})`}), Math.max(1, Math.round(max * f))));
+  lg.append(h("span", {}, h("i", {class: "sw", style: "background:#fff;border:1.5px solid var(--t2);border-radius:50%;width:8px;height:8px"}), "已录入题目正文"));
+  const miss = SUBJECTS.filter(s => !P.some(p => p.subject === s));
+  if (miss.length) lg.append(h("span", {style: "margin-left:auto;color:var(--accent)"}, "缺口学科：" + miss.join("、")));
+})();
+
+/* ---------------- Donuts & bars ---------------- */
+function donut(el, data, colors, names) {
+  const total = data.reduce((s, d) => s + d[1], 0), R = 46, C = 2 * Math.PI * R;
+  let off = 0;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 130 130"); svg.setAttribute("class", "donut");
+  svg.innerHTML = `<circle cx="65" cy="65" r="${R}" fill="none" stroke="var(--heat0)" stroke-width="18"/>` +
+    data.map(([k, v]) => {
+      const len = v / total * C, s = `<circle cx="65" cy="65" r="${R}" fill="none" stroke="${colors[k] || "#999"}" stroke-width="18" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 65 65)"><title>${names[k] || k}: ${v}</title></circle>`;
+      off += len; return s;
+    }).join("") +
+    `<text x="65" y="63" text-anchor="middle" font-size="22" font-weight="700">${total}</text><text x="65" y="80" text-anchor="middle" font-size="11" fill="var(--mute)" style="fill:var(--mute)">条记录</text>`;
+  el.replaceChildren(h("div", {class: "donut-wrap"}, svg,
+    h("ul", {class: "lg"}, data.map(([k, v]) => h("li", {}, h("i", {class: "dot", style: `background:${colors[k] || "#999"}`}), names[k] || k,
+      h("span", {class: "v"}, `${v} · ${(v / total * 100).toFixed(1)}%`))))));
+}
+function hbars(el, data) {
+  const max = Math.max(...data.map(d => d[1]));
+  el.replaceChildren(h("div", {class: "hb"}, data.flatMap(([k, v]) => [
+    h("span", {}, k), h("span", {class: "t"}, h("i", {style: `width:${v / max * 100}%`})), h("span", {class: "v"}, v)])));
+}
+function renderScope(scope) {
+  const rows = D[scope];
+  donut($("#c-tier"), Object.entries(count(rows, r => r.tier)).sort(), TIER_COLOR, TIER_NAME);
+  donut($("#c-status"), Object.entries(count(rows, r => r.status)).sort((a, b) => b[1] - a[1]), STATUS_COLOR, STATUS);
+  hbars($("#c-region"), Object.entries(count(rows, r => r.region)).sort((a, b) => b[1] - a[1]).slice(0, 12));
+}
+document.querySelectorAll("#scope button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#scope button").forEach(x => x.classList.toggle("on", x === b));
+  renderScope(b.dataset.v);
+});
+renderScope("questions");
+
+/* ---------------- Modal ---------------- */
+const dlg = $("#dlg");
+$("#dlg-x").onclick = () => dlg.close();
+dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+function openQ(q) {
+  $("#dlg-t").textContent = `${q.year} 年 · ${q.paper}${q.no ? " 第" + q.no + "题" : ""}`;
+  const b = $("#dlg-b"); b.replaceChildren(
+    h("div", {style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap"}, statusPill(q.status), tierBadge(q.tier),
+      h("span", {class: "sub", style: "margin:0"}, `${q.subject} · ${q.type}${q.score ? " · " + q.score + " 分" : ""} · ${q.id}`)),
+    h("h4", {}, "题干"), h("div", {class: "stem"}, q.stem || ""),
+    q.analysis ? [h("h4", {}, "命题思路 / 解析"), h("div", {}, q.analysis)] : null,
+    q.kp.length ? [h("h4", {}, "知识点"), h("div", {class: "kp", style: "display:flex;gap:6px;flex-wrap:wrap"}, q.kp.map(k => h("span", {class: "pill", style: "color:var(--mute)"}, k)))] : null,
+    h("h4", {}, "出处（可溯源）"),
+    h("ul", {},
+      h("li", {}, tierBadge(q.tier), " ", h("a", {href: q.url, target: "_blank", rel: "noopener"}, q.source_name || q.url)),
+      q.evidence.map(e => h("li", {}, tierBadge(e.tier || "T3"), " ", h("a", {href: e.url, target: "_blank", rel: "noopener"}, e.name || e.url), " ", h("span", {class: "sub"}, "（独立佐证）")))),
+    h("h4", {}, "核验方式"), h("div", {}, q.method || "—"));
+  dlg.showModal();
+}
+
+/* ---------------- Questions explorer ---------------- */
+const qState = {year: ""};
+(function initQ() {
+  const regions = [...new Set(Q.map(q => q.region))];
+  $("#q-region").append(h("option", {value: ""}, "全部地区"), regions.map(r => h("option", {value: r}, r)));
+  $("#q-status").append(h("option", {value: ""}, "全部核验状态"), [...new Set(Q.map(q => q.status))].map(s => h("option", {value: s}, STATUS[s] || s)));
+  const yc = count(Q, q => q.year), ys = Object.keys(yc).sort((a, b) => b - a);
+  const box = $("#q-years");
+  const mk = (v, label, n) => h("button", {class: "chip" + (qState.year === v ? " on" : ""), onclick: () => { qState.year = v; initChips(); renderQ(); }}, label, h("small", {}, n));
+  function initChips() { box.replaceChildren(mk("", "全部", Q.length), ys.map(y => mk(y, y, yc[y]))); }
+  initChips();
+  ["#q-region", "#q-status"].forEach(s => $(s).onchange = renderQ);
+  $("#q-search").oninput = renderQ;
+  renderQ();
+})();
+function renderQ() {
+  const r = $("#q-region").value, s = $("#q-status").value, t = $("#q-search").value.trim().toLowerCase();
+  const list = Q.filter(q => (!qState.year || String(q.year) === qState.year) && (!r || q.region === r) && (!s || q.status === s) &&
+    (!t || [q.stem, q.paper, q.analysis, q.kp.join(" ")].join(" ").toLowerCase().includes(t)));
+  $("#q-list").replaceChildren(...(list.length ? list.map(q => h("div", {class: "card q", onclick: () => openQ(q), tabindex: 0, onkeydown: e => e.key === "Enter" && openQ(q)},
+    h("div", {class: "top"}, h("span", {class: "yr"}, q.year), h("span", {class: "pp"}, q.paper), h("span", {style: "margin-left:auto;display:flex;gap:6px;align-items:center"}, statusPill(q.status), tierBadge(q.tier))),
+    h("div", {class: "stem"}, (q.stem || "").replace(/\s+/g, " ")),
+    h("div", {class: "kp"}, q.kp.slice(0, 4).map(k => h("span", {}, k))))) : [h("div", {class: "empty"}, "没有符合条件的题目")]));
+}
+
+/* ---------------- Papers table ---------------- */
+const pState = {page: 0, size: 15, sort: "year", dir: -1};
+const COLS = [["year", "年份"], ["subject", "学科"], ["paper", "卷别"], ["region", "地区"], ["system", "考试体系"], ["nq", "已录题数"], ["tier", "来源"], ["status", "状态"], ["url", "原卷"]];
+(function initP() {
+  const opts = (sel, key, all) => $(sel).append(h("option", {value: ""}, all), [...new Set(P.map(p => p[key]))].sort().map(v => h("option", {value: v}, v)));
+  opts("#p-subject", "subject", "全部学科"); opts("#p-region", "region", "全部地区"); opts("#p-system", "system", "全部体系");
+  ["#p-subject", "#p-region", "#p-system"].forEach(s => $(s).onchange = () => { pState.page = 0; renderPapers(); });
+  $("#p-search").oninput = () => { pState.page = 0; renderPapers(); };
+  $("#p-prev").onclick = () => { pState.page--; renderPapers(); };
+  $("#p-next").onclick = () => { pState.page++; renderPapers(); };
+  $("#p-head").append(h("tr", {}, COLS.map(([k, l]) => h("th", {"data-k": k, onclick: () => {
+    if (k === "url") return;
+    pState.dir = pState.sort === k ? -pState.dir : 1; pState.sort = k; renderPapers();
+  }}, l))));
+  renderPapers();
+})();
+function renderPapers() {
+  const sub = $("#p-subject").value, reg = $("#p-region").value, sys = $("#p-system").value, t = $("#p-search").value.trim();
+  let list = P.filter(p => (!sub || p.subject === sub) && (!reg || p.region === reg) && (!sys || p.system === sys) &&
+    (!t || `${p.year} ${p.paper} ${p.region}`.includes(t)));
+  const k = pState.sort, d = pState.dir;
+  list.sort((a, b) => (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * d || b.year - a.year);
+  const pages = Math.max(1, Math.ceil(list.length / pState.size));
+  pState.page = Math.min(Math.max(0, pState.page), pages - 1);
+  document.querySelectorAll("#p-head th").forEach(th => th.classList.toggle("on", th.dataset.k === k));
+  $("#p-body").replaceChildren(...list.slice(pState.page * pState.size, (pState.page + 1) * pState.size).map(p => h("tr", {},
+    h("td", {}, p.year), h("td", {}, p.subject), h("td", {}, p.paper), h("td", {}, p.region), h("td", {}, p.system || "—"),
+    h("td", {}, p.nq || "—"), h("td", {}, tierBadge(p.tier)), h("td", {}, statusPill(p.status)),
+    h("td", {}, p.url ? h("a", {href: p.url, target: "_blank", rel: "noopener"}, p.nq ? "出处" : "PDF") : "—"))));
+  $("#p-count").textContent = `共 ${list.length} 份`;
+  $("#p-page").textContent = `${pState.page + 1} / ${pages}`;
+  $("#p-prev").disabled = pState.page <= 0; $("#p-next").disabled = pState.page >= pages - 1;
+}
+
+/* ---------------- PDF library ---------------- */
+const KIND = {typeset: "整卷重排", excerpt: "节选卷", archive: "原卷套版"};
+const KIND_TIP = {typeset: "var(--ok)", excerpt: "var(--warn)", archive: "var(--t2)"};
+const PD = D.pdfs.filter(x => x.ok);
+const fs = {page: 0, size: 15};
+(function initPdf() {
+  const box = $("#pdf-kpis");
+  if (!D.pdfs.length) { box.replaceChildren(h("div", {class: "empty"}, "还没有编译产物：运行 papers-pdf workflow（或 scripts/pdf/build_pdfs.py）后重新 make viz。")); return; }
+  for (const k of Object.keys(KIND)) {
+    const xs = PD.filter(x => x.kind === k);
+    box.append(h("div", {class: "card kpi"}, h("div", {class: "n", style: `color:${KIND_TIP[k]}`}, xs.length), h("div", {class: "l"}, KIND[k]),
+      h("div", {class: "d"}, [...new Set(xs.map(x => x.subject))].join("、") || "—")));
+  }
+  const bad = D.pdfs.length - PD.length;
+  box.append(h("div", {class: "card kpi" + (bad ? " bad" : "")}, h("div", {class: "n"}, bad), h("div", {class: "l"}, "编译失败"), h("div", {class: "d"}, `共 ${D.pdfs.length} 个任务`)));
+  const opt = (sel, all, vals, lab = v => v) => $(sel).append(h("option", {value: ""}, all), vals.map(v => h("option", {value: v}, lab(v))));
+  opt("#f-kind", "全部类型", Object.keys(KIND), k => KIND[k]);
+  opt("#f-subj", "全部学科", [...new Set(PD.map(x => x.subject))]);
+  opt("#f-ed", "全部版本", [...new Set(PD.map(x => x.edition))]);
+  opt("#f-yr", "全部年份", [...new Set(PD.map(x => x.year))].sort((a, b) => b - a));
+  for (const s of ["#f-kind", "#f-subj", "#f-ed", "#f-yr"]) $(s).onchange = () => { fs.page = 0; renderPdf(); };
+  $("#f-q").oninput = () => { fs.page = 0; renderPdf(); };
+  $("#f-prev").onclick = () => { fs.page--; renderPdf(); }; $("#f-next").onclick = () => { fs.page++; renderPdf(); };
+  renderPdf();
+})();
+function renderPdf() {
+  const k = $("#f-kind").value, s = $("#f-subj").value, e = $("#f-ed").value, y = $("#f-yr").value, q = $("#f-q").value.trim();
+  const list = PD.filter(x => (!k || x.kind === k) && (!s || x.subject === s) && (!e || x.edition === e) && (!y || String(x.year) === y) && (!q || x.title.includes(q)))
+    .sort((a, b) => b.year - a.year || a.title.localeCompare(b.title, "zh") || a.edition.localeCompare(b.edition, "zh"));
+  const pages = Math.max(1, Math.ceil(list.length / fs.size));
+  fs.page = Math.min(Math.max(0, fs.page), pages - 1);
+  $("#f-body").replaceChildren(...list.slice(fs.page * fs.size, (fs.page + 1) * fs.size).map(x => h("tr", {},
+    h("td", {}, x.year), h("td", {}, x.subject), h("td", {}, x.title.replace(/^\d+年\s*/, "")),
+    h("td", {}, h("span", {class: "pill", style: `color:${KIND_TIP[x.kind]}`}, KIND[x.kind])), h("td", {}, x.edition),
+    h("td", {}, x.pages || "—"), h("td", {}, x.size ? (x.size / 1024).toFixed(0) + " KB" : "—"),
+    h("td", {}, x.in_repo ? h("a", {href: "pdf/" + x.path, target: "_blank"}, "打开 PDF")
+      : h("a", {href: `https://github.com/zhzx2026/gaokao-qbnk/releases/download/${D.pdf_release_tag || "pdf-latest"}/${x.zip}`, title: "在 zip 内：" + x.path}, "Release 压缩包")))));
+  $("#f-count").textContent = `共 ${list.length} 份`; $("#f-page").textContent = `${fs.page + 1} / ${pages}`;
+  $("#f-prev").disabled = fs.page <= 0; $("#f-next").disabled = fs.page >= pages - 1;
+}
+
+/* ---------------- Sources ---------------- */
+$("#tier-defs").textContent = "T1 命题机构官方 → T2 官方授权媒体 → T3 大型教育媒体/开放数据集 → T4 社区/UGC（不得直接入库）。";
+$("#src-list").append(...D.sources.slice().sort((a, b) => a.tier.localeCompare(b.tier) || b.records - a.records).map(s =>
+  h("div", {class: "card src"},
+    h("div", {class: "nm"}, tierBadge(s.tier), " ", h("a", {href: s.url, target: "_blank", rel: "noopener"}, s.name)),
+    h("div", {class: "meta"}, h("span", {}, s.records ? `${s.records} 条记录引用` : "尚无记录"), "·", h("span", {}, "状态：" + (s.status || "—")),
+      "·", h("span", {}, "全文策略：" + (s.policy || "—")), s.adapter ? ["·", h("span", {}, "适配器 ✓")] : null))));
+
+/* ---------------- Gate ---------------- */
+(function () {
+  const qn = D.quarantine, allowed = Q.length + P.length;
+  $("#gate-body").append(
+    h("div", {class: "card col"}, h("div", {class: "sub", style: "margin:0"}, "正式库（已过校验）"), h("div", {class: "num", style: "color:var(--ok)"}, allowed),
+      h("div", {}, `${Q.length} 条题目 + ${P.length} 份试卷，均带可核验出处`)),
+    h("div", {class: "arrow"}, "⇄"),
+    h("div", {class: "card col"}, h("div", {class: "sub", style: "margin:0"}, "隔离区（拒收 / 待核验）"), h("div", {class: "num", style: "color:var(--bad)"}, qn.total),
+      h("div", {}, Object.entries(qn.by_status).map(([k, v]) => `${STATUS[k] || k} ${v}`).join("，") + "；题型：" + Object.entries(qn.by_type).map(([k, v]) => `${k} ${v}`).join("，")),
+      h("ul", {class: "rules"}, h("li", {}, "E-SRC-T4：T4 来源不得直接入库"), h("li", {}, "E-SRC-NOURL：无出处链接即野题"),
+        h("li", {}, "E-VERIFY-EVIDENCE：声称 verified 必须有第二来源"), h("li", {}, "E-SRC-HOST：链接域名须与登记表一致"))));
+  $("#foot").innerHTML = `数据生成于 ${D.generated_at} · 由 <code>python3 -m tools.qbnk.cli viz</code> 生成 · 试题著作权归命题机构，详见 DATA-LICENSE.md`;
+})();
+</script>
+</body>
+</html>
